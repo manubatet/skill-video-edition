@@ -1,0 +1,915 @@
+{
+  "source": "/home/user/skill-video-edition/video_2026-09-26_edit/input.mp4",
+  "language": "es",
+  "model": "large-v3",
+  "diarized": false,
+  "speakers": [],
+  "width": 848,
+  "height": 480,
+  "fps": 30.0,
+  "duration": 28.543628,
+  "has_audio": true,
+  "sentences": [
+    {
+      "id": 0,
+      "words": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44,
+        45,
+        46,
+        47,
+        48,
+        49,
+        50,
+        51,
+        52,
+        53,
+        54,
+        55,
+        56,
+        57,
+        58,
+        59,
+        60,
+        61,
+        62,
+        63,
+        64,
+        65,
+        66,
+        67,
+        68,
+        69,
+        70,
+        71,
+        72,
+        73,
+        74,
+        75,
+        76,
+        77,
+        78,
+        79,
+        80,
+        81,
+        82,
+        83,
+        84,
+        85,
+        86,
+        87,
+        88
+      ],
+      "speaker": null,
+      "text": "Sí, se puede superar y además es un tratamiento muy efectivo, se basa en la exposición gradual a aquello que se teme, acompañamos y enseñamos a la persona a poder enfrentarse gestionando esa ansiedad de forma muy gradual y pautada y además trabajamos con los pensamientos negativos, catastróficos, para que la persona no se quede enganchada a esos pensamientos y pueda gestionar la ansiedad y también con las sensaciones físicas para que no sean tan intensas y que la persona se pueda enfrentar poco a poco e ir superándolo.",
+      "start": 0.436,
+      "end": 28.262
+    }
+  ],
+  "words": [
+    {
+      "i": 0,
+      "text": "Sí,",
+      "start": 0.436,
+      "end": 0.737,
+      "score": 0.483,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 1,
+      "text": "se",
+      "start": 0.757,
+      "end": 0.817,
+      "score": 0.8,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 2,
+      "text": "puede",
+      "start": 0.857,
+      "end": 1.057,
+      "score": 0.772,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 3,
+      "text": "superar",
+      "start": 1.137,
+      "end": 1.498,
+      "score": 0.945,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 4,
+      "text": "y",
+      "start": 1.578,
+      "end": 1.618,
+      "score": 0.868,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 5,
+      "text": "además",
+      "start": 1.658,
+      "end": 1.979,
+      "score": 0.883,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 6,
+      "text": "es",
+      "start": 2.079,
+      "end": 2.159,
+      "score": 0.942,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 7,
+      "text": "un",
+      "start": 2.219,
+      "end": 2.279,
+      "score": 0.773,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 8,
+      "text": "tratamiento",
+      "start": 2.299,
+      "end": 2.72,
+      "score": 0.888,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 9,
+      "text": "muy",
+      "start": 2.78,
+      "end": 2.9,
+      "score": 0.709,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 10,
+      "text": "efectivo,",
+      "start": 2.96,
+      "end": 3.501,
+      "score": 0.954,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 11,
+      "text": "se",
+      "start": 3.621,
+      "end": 3.721,
+      "score": 0.982,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 12,
+      "text": "basa",
+      "start": 3.802,
+      "end": 4.162,
+      "score": 0.396,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 13,
+      "text": "en",
+      "start": 4.423,
+      "end": 4.543,
+      "score": 0.832,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 14,
+      "text": "la",
+      "start": 4.643,
+      "end": 4.763,
+      "score": 0.992,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 15,
+      "text": "exposición",
+      "start": 4.923,
+      "end": 5.464,
+      "score": 0.922,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 16,
+      "text": "gradual",
+      "start": 5.565,
+      "end": 5.985,
+      "score": 0.983,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 17,
+      "text": "a",
+      "start": 6.005,
+      "end": 6.025,
+      "score": 0.002,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 18,
+      "text": "aquello",
+      "start": 6.146,
+      "end": 6.626,
+      "score": 0.763,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 19,
+      "text": "que",
+      "start": 6.727,
+      "end": 6.807,
+      "score": 0.855,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 20,
+      "text": "se",
+      "start": 6.867,
+      "end": 6.947,
+      "score": 0.833,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 21,
+      "text": "teme,",
+      "start": 7.027,
+      "end": 7.227,
+      "score": 0.826,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 22,
+      "text": "acompañamos",
+      "start": 7.247,
+      "end": 7.728,
+      "score": 0.826,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 23,
+      "text": "y",
+      "start": 7.768,
+      "end": 7.808,
+      "score": 0.651,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 24,
+      "text": "enseñamos",
+      "start": 7.848,
+      "end": 8.209,
+      "score": 0.897,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 25,
+      "text": "a",
+      "start": 8.229,
+      "end": 8.249,
+      "score": 0.059,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 26,
+      "text": "la",
+      "start": 8.269,
+      "end": 8.53,
+      "score": 0.324,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 27,
+      "text": "persona",
+      "start": 8.57,
+      "end": 8.85,
+      "score": 0.663,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 28,
+      "text": "a",
+      "start": 8.87,
+      "end": 8.89,
+      "score": 0.028,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 29,
+      "text": "poder",
+      "start": 8.93,
+      "end": 9.151,
+      "score": 0.81,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 30,
+      "text": "enfrentarse",
+      "start": 9.191,
+      "end": 9.752,
+      "score": 0.849,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 31,
+      "text": "gestionando",
+      "start": 10.132,
+      "end": 10.553,
+      "score": 0.903,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 32,
+      "text": "esa",
+      "start": 10.573,
+      "end": 10.673,
+      "score": 0.51,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 33,
+      "text": "ansiedad",
+      "start": 10.693,
+      "end": 10.934,
+      "score": 0.578,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 34,
+      "text": "de",
+      "start": 10.974,
+      "end": 11.034,
+      "score": 0.788,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 35,
+      "text": "forma",
+      "start": 11.094,
+      "end": 11.294,
+      "score": 0.941,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 36,
+      "text": "muy",
+      "start": 11.374,
+      "end": 11.474,
+      "score": 0.835,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 37,
+      "text": "gradual",
+      "start": 11.514,
+      "end": 11.855,
+      "score": 0.936,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 38,
+      "text": "y",
+      "start": 11.875,
+      "end": 11.895,
+      "score": 0.003,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 39,
+      "text": "pautada",
+      "start": 12.136,
+      "end": 12.536,
+      "score": 0.859,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 40,
+      "text": "y",
+      "start": 12.556,
+      "end": 12.576,
+      "score": 0.013,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 41,
+      "text": "además",
+      "start": 12.837,
+      "end": 13.137,
+      "score": 0.88,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 42,
+      "text": "trabajamos",
+      "start": 13.217,
+      "end": 13.718,
+      "score": 0.804,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 43,
+      "text": "con",
+      "start": 13.798,
+      "end": 13.919,
+      "score": 0.87,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 44,
+      "text": "los",
+      "start": 13.959,
+      "end": 14.059,
+      "score": 0.702,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 45,
+      "text": "pensamientos",
+      "start": 14.119,
+      "end": 14.78,
+      "score": 0.918,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 46,
+      "text": "negativos,",
+      "start": 15.261,
+      "end": 15.762,
+      "score": 0.66,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 47,
+      "text": "catastróficos,",
+      "start": 15.802,
+      "end": 16.503,
+      "score": 0.863,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 48,
+      "text": "para",
+      "start": 16.583,
+      "end": 16.723,
+      "score": 0.806,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 49,
+      "text": "que",
+      "start": 16.763,
+      "end": 16.863,
+      "score": 0.699,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 50,
+      "text": "la",
+      "start": 16.903,
+      "end": 16.964,
+      "score": 0.766,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 51,
+      "text": "persona",
+      "start": 17.004,
+      "end": 17.304,
+      "score": 0.84,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 52,
+      "text": "no",
+      "start": 17.364,
+      "end": 17.404,
+      "score": 0.996,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 53,
+      "text": "se",
+      "start": 17.444,
+      "end": 17.525,
+      "score": 0.691,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 54,
+      "text": "quede",
+      "start": 17.565,
+      "end": 17.705,
+      "score": 0.922,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 55,
+      "text": "enganchada",
+      "start": 17.725,
+      "end": 18.186,
+      "score": 0.704,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 56,
+      "text": "a",
+      "start": 18.707,
+      "end": 18.807,
+      "score": 0.983,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 57,
+      "text": "esos",
+      "start": 19.067,
+      "end": 19.308,
+      "score": 0.728,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 58,
+      "text": "pensamientos",
+      "start": 19.388,
+      "end": 20.009,
+      "score": 0.858,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 59,
+      "text": "y",
+      "start": 20.029,
+      "end": 20.049,
+      "score": 0.032,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 60,
+      "text": "pueda",
+      "start": 20.469,
+      "end": 20.73,
+      "score": 0.416,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 61,
+      "text": "gestionar",
+      "start": 20.83,
+      "end": 21.211,
+      "score": 0.794,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 62,
+      "text": "la",
+      "start": 21.251,
+      "end": 21.291,
+      "score": 0.964,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 63,
+      "text": "ansiedad",
+      "start": 21.331,
+      "end": 21.611,
+      "score": 0.712,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 64,
+      "text": "y",
+      "start": 21.631,
+      "end": 21.651,
+      "score": 0.011,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 65,
+      "text": "también",
+      "start": 21.912,
+      "end": 22.132,
+      "score": 0.845,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 66,
+      "text": "con",
+      "start": 22.192,
+      "end": 22.292,
+      "score": 0.731,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 67,
+      "text": "las",
+      "start": 22.333,
+      "end": 22.453,
+      "score": 0.835,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 68,
+      "text": "sensaciones",
+      "start": 22.553,
+      "end": 23.074,
+      "score": 0.889,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 69,
+      "text": "físicas",
+      "start": 23.154,
+      "end": 23.555,
+      "score": 0.84,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 70,
+      "text": "para",
+      "start": 23.695,
+      "end": 23.835,
+      "score": 0.812,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 71,
+      "text": "que",
+      "start": 23.875,
+      "end": 23.975,
+      "score": 0.732,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 72,
+      "text": "no",
+      "start": 23.995,
+      "end": 24.055,
+      "score": 0.968,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 73,
+      "text": "sean",
+      "start": 24.096,
+      "end": 24.256,
+      "score": 0.758,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 74,
+      "text": "tan",
+      "start": 24.296,
+      "end": 24.416,
+      "score": 0.803,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 75,
+      "text": "intensas",
+      "start": 24.476,
+      "end": 24.857,
+      "score": 0.848,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 76,
+      "text": "y",
+      "start": 24.877,
+      "end": 24.897,
+      "score": 0.016,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 77,
+      "text": "que",
+      "start": 25.338,
+      "end": 25.418,
+      "score": 0.801,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 78,
+      "text": "la",
+      "start": 25.458,
+      "end": 25.518,
+      "score": 0.744,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 79,
+      "text": "persona",
+      "start": 25.538,
+      "end": 25.758,
+      "score": 0.89,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 80,
+      "text": "se",
+      "start": 25.798,
+      "end": 25.858,
+      "score": 0.98,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 81,
+      "text": "pueda",
+      "start": 25.919,
+      "end": 26.099,
+      "score": 0.904,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 82,
+      "text": "enfrentar",
+      "start": 26.319,
+      "end": 26.76,
+      "score": 0.844,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 83,
+      "text": "poco",
+      "start": 27.02,
+      "end": 27.201,
+      "score": 0.861,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 84,
+      "text": "a",
+      "start": 27.221,
+      "end": 27.241,
+      "score": 0.963,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 85,
+      "text": "poco",
+      "start": 27.321,
+      "end": 27.521,
+      "score": 0.911,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 86,
+      "text": "e",
+      "start": 27.541,
+      "end": 27.561,
+      "score": 0.008,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 87,
+      "text": "ir",
+      "start": 27.621,
+      "end": 27.702,
+      "score": 0.843,
+      "speaker": null,
+      "sentence": 0
+    },
+    {
+      "i": 88,
+      "text": "superándolo.",
+      "start": 27.762,
+      "end": 28.262,
+      "score": 0.915,
+      "speaker": null,
+      "sentence": 0
+    }
+  ]
+}

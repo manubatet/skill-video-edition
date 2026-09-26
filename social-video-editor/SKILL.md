@@ -5,7 +5,7 @@ description: "Edit a Spanish talking-head video for social media with open-sourc
 
 # Social Video Editor (Spanish, v1)
 
-Turns a raw Spanish talking-head video into a social-ready edit: retakes and dead air removed, clean loud audio, burned-in captions with highlighted keywords, punch-in zooms, sparse sound effects and custom animations that Claude writes as code.
+Turns a raw Spanish talking-head video into a social-ready edit: retakes and dead air removed, clean loud audio, burned-in captions with highlighted keywords, gradual (eased) push-in zooms, sparse sound effects and custom animations that Claude writes as code.
 
 Appendix A holds the PRD (the why and the scope). Appendix B holds the scripts. This section holds the procedure.
 
@@ -41,16 +41,38 @@ The pipeline needs Python 3.9+, FFmpeg built with libass, and a machine that can
 
 If a model download is blocked (sandboxed or offline machine), say so plainly. Ask the user to run the transcription step on their own machine, or to provide the `transcript.json`.
 
-## Intake: ask once, all together
+## Intake: two quick rounds
 
-Ask these with AskUserQuestion in **one** call. The recommended option comes first. If nobody answers, use the defaults and state them.
+Ask with AskUserQuestion. The recommended option comes first. If nobody answers, use the defaults and state them. AskUserQuestion takes at most 4 questions and 4 options per question, and it always adds a free-text "Other". So the intake runs in two calls, back to back, before any heavy work starts.
+
+### Round 1: what to add
 
 1. **Captions**: Karaoke, 3 words with the current word highlighted (recommended) / One word at a time / Phrases / No captions.
 2. **Caption position**: Bottom, above the platform UI (recommended) / Middle / Top.
-3. **Effects** (multi-select, all on by default): Punch-in zooms / Sound effects / Animations.
+3. **Effects**: a **multi-select** question (`multiSelect: true`), never single choice. Options: Punch-in zooms / Sound effects / Animations. Word the question so it is obvious that several can be ticked and that anything else can be written in the free-text "Other" field. For example: "¿Qué efectos quieres? Marca todos los que quieras. Si quieres añadir algo más (una escena animada a pantalla completa, un estilo concreto, algo a evitar…), escríbelo en 'Other'." If nobody answers, all three are on.
 4. **Speakers**: One person (recommended) / Two / Three or more. Skip this question when a Hugging Face token is available: detect speakers instead and only confirm the result.
 
-Also invite a **glossary** in the same message: names, brands and anglicisms Whisper might misspell. Pass it to `--glossary`.
+In the same message, also invite:
+- a **glossary**: names, brands and anglicisms Whisper might misspell. Pass it to `--glossary`.
+- **anything else to add**: an open line such as "¿Hay algo más que quieras añadir o que deba tener en cuenta?". Treat whatever comes back, here or in "Other", as a requirement. Plan it in the proposal table (Checkpoint 1) like any other effect.
+
+### Round 2: style guide (right after round 1)
+Ask this round when captions or animations are on. Skip it only when both are off.
+
+5. **Animation style**: ask only if Animations was selected. Single choice. The question text must invite a custom style in "Other", for example: "¿Qué estilo quieres para las animaciones? Si ninguno encaja, descríbelo en 'Other' (referencias, marcas, cuentas que te gusten…)." Offer the four presets from *Animation style presets*, with the one that best fits the video's tone first as "(Recommended)":
+   - **Tarjetas bold**: pills sólidas, rebote, tipografía gruesa en mayúsculas.
+   - **Minimal limpio**: líneas finas, fundidos y deslizamientos suaves, sin rebote.
+   - **Flat 2D ilustrado**: iconos y personajes simples de colores planos.
+   - **Neón tech**: fondo oscuro, bordes brillantes, entradas rápidas.
+6. **Color palette (style guide)**: single choice. Offer the four presets from *Color palette presets*. Put the five HEX codes in each option's `description`, so the user sees the actual colours. Put the preset that best fits the video's topic first as "(Recommended)". The question text must explain the "Other" format, for example: "¿Qué paleta de colores usamos? Si tienes la tuya, escribe en 'Other' hasta 5 colores HEX en este orden: fondo, texto, principal, secundario, alerta (p. ej. #1E3A4C, #F7F5F0, #5EC2B7, #F4A261, #E76F51)."
+
+Custom answers:
+- **Custom style:** a free-text style becomes `style.anim_style`, holding the user's description. Derive its motion and shape rules from the nearest preset and state them at Checkpoint 1.
+- **Custom palette:** for HEX codes, accept `#RGB`, `#RRGGBB` or codes without `#`, separated by commas or spaces. Map them in order to the five roles.
+  - With fewer than 5 colours, fill the missing roles from the closest preset.
+  - With more than 5 colours, use the first 5 and say so.
+  - With an invalid code, ask again only for that value.
+  - Colour names ("azul marino") are also accepted: convert them to HEX and show the codes you chose.
 
 ## Workflow
 
@@ -60,12 +82,32 @@ python scripts/transcribe.py INPUT.mp4 --out work --glossary "Nombre, Marca" [--
 ```
 This writes `work/transcript.json`, with word-level `start`, `end`, `score` and `speaker`, plus `work/transcript.txt`. Words with a score below 0.4 are likely mistranscriptions. Check them first.
 
-### 2. Checkpoint 1: transcript and cut plan (one message)
-Read `transcript.json` and propose the cuts, following the rules in *Editorial rules > Retakes*. Show the user two things:
-- the transcript, with suspicious words marked;
-- the proposed removals as a short list, for example "S3 removed: retake of S4" or "w120–w123 removed: stutter 'la la'".
+### 2. Checkpoint 1: transcript, cut plan and effects proposal (one message)
+Read `transcript.json` and propose the cuts, following the rules in *Editorial rules > Retakes*. Before writing the message, extract one or two frames (`ffmpeg -ss T -i INPUT -frames:v 1 f.jpg`) and look at them. You need them to spot things that change the plan: burned-in subtitles or titles, landscape framing, and where the free space for animations is.
 
-Ask them to correct wrong words and confirm the cuts.
+Show the user three things:
+- the transcript, with suspicious words marked;
+- the proposed removals as a short list, for example "S3 removed: retake of S4" or "w120–w123 removed: stutter 'la la'";
+- the **effects proposal table**. This is required whenever animations are enabled, and it goes in this first message, not later. Use exactly these columns, one row per animation:
+
+| # | Momento | Frase | Animación | Por qué |
+|---|---|---|---|---|
+| a1 | 0,1 s → 1,6 s | "**Sí**, se puede superar" | **Sello de check**: círculo verde con rebote, ✓ que se dibuja trazo a trazo, "SÍ" debajo | Gancho: responde a la pregunta en el primer segundo |
+
+  Column rules:
+  - **Momento** is in source seconds at this stage; say that times shift slightly after the cuts.
+  - **Frase** quotes the words it illustrates, with the key word in bold.
+  - **Animación** names the pattern in bold, then describes motion, text and colours in one line.
+  - **Por qué** ties it to the sentence's role (hook, data, key claim, cta…).
+
+  Under the table add:
+  - one line on **where** the animations sit (the free area of the frame and the box size), and why it avoids the face and any burned-in text;
+  - one line on the **look**: the chosen palette (key and its 5 HEX codes), the `anim_style` row, the font and the entry/hold/exit timing;
+  - when zooms or emphasis words are on, a short list of the sentences that get a zoom and the words that get highlighted.
+
+  Offer optional extras as a separate "Opcional" line instead of silently adding them.
+
+Ask them to correct wrong words, confirm the cuts and approve or change the table. After the cuts, carry the approved rows into `timeline.json` with edited times. If the user asks to see the plan again, re-show it in the same table.
 
 To apply text fixes, edit the `text` of words in `work/transcript.json` with a small Python snippet. Keep word count and timings unchanged. If a fix merges or splits words, adjust only the text and keep the original number of word entries. Then write `work/edit.json` (schema in `build_edit.py`'s docstring).
 
@@ -76,7 +118,7 @@ python scripts/build_edit.py --work work
 This writes `work/cut.mkv` (cuts, light denoise, two-pass loudness normalization to -14 LUFS), `work/segments.json` and `work/transcript_edited.json/.txt`. Report the before and after duration.
 
 ### 4. Classify and plan effects
-Read `transcript_edited.json`. Then write `work/timeline.json` (schema below), following *Editorial rules*. Include the `classification` array: it documents the reasoning and makes later changes easy to discuss.
+Read `transcript_edited.json`. Then write `work/timeline.json` (schema below), following *Editorial rules* and the table approved at Checkpoint 1. Include the `classification` array: it documents the reasoning and makes later changes easy to discuss. If an approved row cannot be placed as agreed (for example two animations now violate `anim_min_gap`), show the updated table and say what changed.
 
 ### 5. Code the animations
 For each entry in `animations`, write `work/anims/<id>.py` using `anim_kit` (see *Animation guide*). Run it. Then **open the generated `<id>_sheet.png` with Read and inspect it** before continuing. Fix overflowing text, clipped shapes, unreadable contrast and timing that looks wrong.
@@ -107,11 +149,12 @@ Deliver `work/final.mp4`. Also give the extras in the reply, derived from the tr
 {
   "style": {"font": "Montserrat", "text": "#FFFFFF", "highlight": "#FFD400", "emphasis": "#00E676",
             "outline": "#000000", "accent": "#FFD400", "accent_text": "#111111",
-            "panel": "#111111", "panel_text": "#FFFFFF"},
+            "panel": "#111111", "panel_text": "#FFFFFF", "danger": "#FF3B3B",
+            "palette": "energia", "anim_style": "bold"},
   "captions": {"mode": "karaoke", "position": "bottom", "uppercase": true, "max_words": 3, "size": 0.07},
   "classification": [{"sentence": 0, "role": "hook", "importance": "high", "why": "promete 3 claves"}],
   "emphasis_words": [6, 7, 32],
-  "zooms": [{"start": 4.72, "end": 6.58, "scale": 1.15}],
+  "zooms": [{"start": 4.72, "end": 6.58, "scale": 1.15, "ramp": 0.7}],
   "sfx": [{"at": 5.0, "sound": "whoosh", "gain_db": -10}],
   "animations": [{"id": "a1", "file": "work/anims/a1.mov", "start": 2.15, "anchor": "upper-third",
                   "hide_captions": false}],
@@ -126,7 +169,8 @@ Field notes:
 - **`sfx.at`**: the moment the sound should *land*. `render.py` subtracts each sound's lead time automatically, for example 0.22 s for `whoosh` and 1.2 s for `riser`. Set `"align": "start"` to disable this.
 - **Available sounds**: `whoosh` (transitions, new point), `pop` (a word or card appears), `ding` (number or result), `click` (list item), `riser` (build-up before a reveal), `boom` (big claim, use at most once per video).
 - **`animations.anchor`**: `top` | `upper-third` | `center` | `lower-third`. Alternatively give explicit `x` and `y` in pixels for the top-left corner. Use `hide_captions: true` when an animation replaces the captions for its duration.
-- **`zoom_center`**: leave it `null`. It is detected from the face, falling back to `[0.5, 0.4]`.
+- **`zooms`**: every zoom is a **gradual push-in**, never a hard cut. The scale eases in (smoothstep) over `ramp` seconds from `start`, holds, then eases back out over `ramp` seconds before `end`. The default `ramp` is **0.7 s**, capped at half the zoom length. Keep the default; lower it (0.35) only when the user asks for a snappier style. `"ramp": 0` gives the old hard punch-in, so use it only when the user asks for jump-cut style. Because the ramp eats into the zoom, start it about `ramp`/2 (≈0.3 s) before the key word, so the zoom is fully in when the word lands. Make zooms at least 1.4 s long, so both full ramps fit. Shorter ones never reach full scale and read as a quick breathe-in.
+- **`zoom_center`**: leave it `null`. It is detected from the face, falling back to `[0.5, 0.4]`. Set it by hand when the source has burned-in text that the zoom would cut in half. Choose a centre whose crop either keeps that text whole or leaves it out entirely.
 - **`rules`**: overrides the density limits in `render.py` (`RULES`). Change a limit only when the user asks for a denser or calmer style.
 
 ## Editorial rules
@@ -156,7 +200,7 @@ Field notes:
 - Fewer, well-timed effects beat many. When in doubt, leave it out.
 
 **Timing.**
-- Start zooms at the **start of a word**, ideally the first word of the sentence, and end them at a sentence boundary.
+- Start zooms at the **start of a word**, ideally the first word of the sentence, and end them at a sentence boundary. Zooms ease in and out (`ramp`), so they read as a camera push, not a cut.
 - Animations start about 0.1 s before the word they illustrate. Sounds land on the word, or on the animation's entry.
 - Spanish specifics: Whisper's `¿`, `¡` and accents stay in the captions. Numbers often lack timestamps; they are interpolated, so check them in the QA sheet.
 
@@ -174,7 +218,8 @@ Each animation is one Python file using `scripts/anim_kit.py`. It renders to a t
 Design rules:
 - Duration 1.2–2.5 s, with three phases: **entry** 0.25–0.4 s (`out_back` for pop, `out_cubic` for slide), **hold**, **exit** 0.2–0.3 s (`in_cubic` fade or shrink).
 - At most 4 words of text, drawn large. Motion supports the speech; it never competes with it.
-- Colors come only from `load_style()`. This is what makes a v2 style guide work without code changes.
+- Colors come only from `load_style()`: tokens `accent`, `accent_text`, `panel`, `panel_text`, `text`, `emphasis`, `highlight`, `danger`. Never hard-code a HEX in an animation. This is what lets the palette chosen at intake restyle everything without code changes.
+- Motion and shape follow `style.anim_style` (see *Animation style presets* below).
 - No emoji or bitmap logos (fonts render them unreliably). Draw simple icons from primitives: a check mark is a `line`, a progress ring is an `arc`, an arrow is a `line` with a head.
 - Proven patterns:
   - keyword card (pill plus word, pop-in);
@@ -203,10 +248,48 @@ def frame(c, t):
 anim.render("work/anims/a1.mov"); anim.sheet("work/anims/a1_sheet.png")
 ```
 
+## Animation style presets
+
+The intake answer is stored in `style.anim_style`. Every animation in the video follows the same row. The proven patterns above work in every style; only their motion and shapes change.
+
+| Preset (`anim_style`) | Entry / exit | Shapes | Text | Idle motion |
+|---|---|---|---|---|
+| `bold`: Tarjetas bold (default) | `out_back` pop 0.3 s from scale 0.5; exit `in_cubic` shrink and fade 0.25 s | solid `accent` pills or `panel` at alpha 0.85, radius 40–48 | ExtraBold, UPPERCASE, as large as fits | none; the hold is still |
+| `minimal`: Minimal limpio | `out_cubic` fade plus 12–20 px slide, 0.4 s; no overshoot; exit a plain fade 0.3 s | thin lines (width 3–4) and outlines, `panel` alpha ≤ 0.6 or no panel, radius 10–14 | regular or bold weight, sentence case, 20–30 % smaller than bold | none |
+| `flat2d`: Flat 2D ilustrado | `out_back` with a small overshoot, 0.35 s; elements stagger by 0.1–0.15 s | icons and characters built from primitives, flat fills, no outlines, soft background shapes | bold, sentence case, short labels | gentle wiggle or bob (1–3 px, `sin(t·k)`), blinking eyes, walk cycles; best for full-screen scenes |
+| `neon`: Neón tech | fast `out_quint` slide 0.2 s from off-box; exit a fast slide out | dark `panel` alpha 0.9; `accent` outline width 3 plus glow (2–3 wider outlines at alpha 0.25 → 0.08) | ExtraBold UPPERCASE, `accent` or `text` colour | subtle glow pulse (alpha ±0.1 at 1–2 Hz) |
+
+For a free-text style, pick the nearest row and adapt it. At Checkpoint 1, name the row and write one line on what you changed.
+
+## Color palette presets
+
+Each palette has 5 colours with fixed roles: **fondo** (dark base), **texto** (light), **principal**, **secundario**, **alerta**. They map to the `style` tokens like this:
+- `panel` and `accent_text` = fondo;
+- `text` and `panel_text` = texto;
+- `accent` and `highlight` = principal;
+- `emphasis` = secundario;
+- `danger` = alerta;
+- `outline` = `#000000`, always, so captions stay readable on any footage.
+
+Also set `style.palette` to the preset's key, or to `"custom"`.
+
+| Key | Option label | fondo | texto | principal | secundario | alerta | Fits |
+|---|---|---|---|---|---|---|---|
+| `energia` | Energía (amarillo) | `#111111` | `#FFFFFF` | `#FFD400` | `#00E676` | `#FF3B3B` | tips, motivación, negocio; the default |
+| `calma` | Calma (salud) | `#1E3A4C` | `#F7F5F0` | `#5EC2B7` | `#F4A261` | `#E76F51` | salud, psicología, bienestar, educación |
+| `pop` | Pop (rosa y violeta) | `#1A1033` | `#FFFFFF` | `#FF4FA3` | `#7C5CFF` | `#FFD23F` | lifestyle, moda, belleza, entretenimiento |
+| `tierra` | Tierra (elegante) | `#2B2622` | `#FAF6F0` | `#D9B26F` | `#8DB38B` | `#C4553A` | gastronomía, viajes, marca personal premium |
+
+All four keep at least 3:1 WCAG contrast for every role on `fondo`, and at least 4.5:1 for texto and principal. With a custom palette:
+- Check the same contrasts.
+- If principal on fondo is below 3:1, use texto as `accent_text` instead of fondo, and tell the user.
+- If texto on fondo is below 4.5:1, warn the user and propose the nearest fix.
+
 ## QA checklist (preview and QA sheet)
 
 - Captions are readable and never cover the face or an animation. Keywords are highlighted.
 - Zoomed frames keep the face whole, with no forehead cut off, and are not blurry. If they are blurry, lower the scale.
+- Zooms push in and out smoothly in the preview, with no visible jump. A zoom that looks like a cut has `ramp` 0 or is too short for its ramp.
 - Animations sit inside the frame and outside the bottom 20% on vertical video, with no text overflow.
 - `render.py --check` passes with no RULE lines. WARN lines are either fixed or deliberately accepted.
 - Cuts sound natural: no clipped word starts. If a word start is clipped, raise `pad` to 0.15–0.2 s.
@@ -226,7 +309,7 @@ anim.render("work/anims/a1.mov"); anim.sheet("work/anims/a1_sheet.png")
 ## Roadmap hooks (don't build unless asked)
 
 v2 items, in the PRD, fit into the existing contracts without rewrites:
-- **Style guide** → `timeline.style` plus pattern presets.
+- **Style guide** → `timeline.style` (palette and animation-style presets exist; a full brand guide would extend them).
 - **Templates** → preset `timeline.rules` and effect toggles.
 - **Format / auto-reframe** → a crop pass in `build_edit.py`.
 - **Combining videos** → multiple sources in `segments.json`.
@@ -255,7 +338,7 @@ Existing auto-editors are closed SaaS products, work poorly in Spanish, and deco
 
 **Non-goals (v1).** Filler-word removal (explicitly rejected). Multi-camera editing. Background music. Auto-reframing between aspect ratios. Combining videos. Stock B-roll. Languages other than Spanish.
 
-**User flow.** Upload video → 4 quick questions → transcript and cut review → preview with QA → final video plus title, description, hashtags and thumbnail picks.
+**User flow.** Upload video → two short question rounds (effects, then style guide: animation style and colour palette) → transcript and cut review → preview with QA → final video plus title, description, hashtags and thumbnail picks.
 
 **Functional requirements (v1).**
 
@@ -267,7 +350,7 @@ Existing auto-editors are closed SaaS products, work poorly in Spanish, and deco
 | F4 | Audio: light denoise (FFmpeg afftdn, optional DeepFilterNet), two-pass loudness normalization to -14 LUFS, micro-fades at every cut, limiter after SFX |
 | F5 | Captions: karaoke, word or phrase modes; 3 positions with platform safe zones; keyword highlighting; per-speaker colors |
 | F6 | Sentence classification (role, importance) driving zooms, SFX and animations |
-| F7 | Punch-in zooms centered on the detected face (OpenCV) |
+| F7 | Gradual push-in zooms (eased in and out, per-frame scale and crop) centered on the detected face (OpenCV) |
 | F8 | SFX from a procedurally synthesized royalty-free library, with automatic lead-time alignment; user files can override it |
 | F9 | Animations coded by Claude per video (Pillow-based kit, rendered as transparent overlays), with a self-review contact sheet |
 | F10 | Density-rule validator (`--check`) that blocks over-decorated timelines |
@@ -321,7 +404,7 @@ video ─► transcribe.py ─► transcript.json ──(Claude: retakes)──�
 | Synthesized SFX sound basic | Drop-in replacement with CC0 files |
 
 **Roadmap.**
-- **v1.5:** animation pattern library (reusable parametrized files); smooth (eased) zooms; B-roll suggestions.
+- **v1.5:** animation pattern library (reusable parametrized files); B-roll suggestions.
 - **v2:**
   - output formats and auto-reframe (MediaPipe face tracking);
   - video templates (animations only; animations plus emphasis; SFX on/off);
@@ -988,7 +1071,8 @@ from PIL import Image, ImageDraw, ImageFont
 
 STYLE_DEFAULTS = {"font": "Montserrat", "text": "#FFFFFF", "highlight": "#FFD400", "emphasis": "#00E676",
                   "outline": "#000000", "accent": "#FFD400", "accent_text": "#111111",
-                  "panel": "#111111", "panel_text": "#FFFFFF"}
+                  "panel": "#111111", "panel_text": "#FFFFFF", "danger": "#FF3B3B",
+                  "anim_style": "bold"}
 
 
 def load_style(work="work"):
@@ -1386,6 +1470,8 @@ def validate(tl, tr, anims_meta, rules):
     for z in zooms:
         if z["end"] - z["start"] < rules["zoom_min_len"]:
             errs.append(f"zoom {z['start']}-{z['end']} shorter than {rules['zoom_min_len']}s")
+        if z.get("ramp", 0.7) < 0:
+            errs.append(f"zoom {z['start']} ramp must be >= 0")
         if not (1.0 < z.get("scale", 1.15) <= rules["zoom_max_scale"]):
             errs.append(f"zoom {z['start']} scale must be in (1, {rules['zoom_max_scale']}]")
         if z["start"] < 0 or z["end"] > D + 0.05:
@@ -1459,32 +1545,37 @@ def face_center(video, samples=15):
     return xs[len(xs) // 2], ys[len(ys) // 2]
 
 
-def crop_for(scale, center, W, H):
-    cw, ch = int(W / scale) // 2 * 2, int(H / scale) // 2 * 2
-    fx, fy = center
-    x = min(max(fx * W - cw / 2, 0), W - cw)
-    y = min(max(fy * H - 0.42 * ch, 0), H - ch)  # face sits slightly above the crop centre
-    return cw, ch, int(x), int(y)
+def zoom_expr(zooms, default_ramp=0.7):
+    """FFmpeg expression for the zoom factor at time t: 1 outside zooms, eased (smoothstep)
+    in over `ramp` s after start, held, eased out over `ramp` s before end. Gradual
+    push-ins instead of hard cuts; "ramp": 0 restores the hard punch-in."""
+    terms = []
+    for z in zooms:
+        a, b, s = z["start"], z["end"], z.get("scale", 1.15)
+        r = min(max(z.get("ramp", default_ramp), 0.0), (b - a) / 2)
+        if r < 1e-3:
+            env = f"between(t,{a},{b - 0.001})"
+        else:
+            p_in, p_out = f"clip((t-{a})/{r:.3f},0,1)", f"clip(({b}-t)/{r:.3f},0,1)"
+            env = f"({p_in})*({p_in})*(3-2*({p_in}))*({p_out})*({p_out})*(3-2*({p_out}))"
+        terms.append(f"{s - 1:.4f}*{env}")
+    return "(1+" + "+".join(terms) + ")"
 
 
 def build_graph(tl, tr, anims_meta, sfx_dir, center, preview):
     W, H = tr["width"], tr["height"]
     inputs, fc = [], []
     v = "0:v"
-    zooms = tl.get("zooms", [])
-    by_scale = {}
-    for z in zooms:
-        by_scale.setdefault(round(z.get("scale", 1.15), 3), []).append(z)
-    if by_scale:
-        outs = "".join(f"[zsrc{k}]" for k in range(len(by_scale)))
-        fc.append(f"[{v}]split={len(by_scale) + 1}[vbase]{outs}")
-        v = "vbase"
-        for k, (s, zs) in enumerate(by_scale.items()):
-            cw, ch, x, y = crop_for(s, center, W, H)
-            en = "+".join(f"between(t,{z['start']},{z['end'] - 0.001})" for z in zs)
-            fc.append(f"[zsrc{k}]crop={cw}:{ch}:{x}:{y},scale={W}:{H}:flags=lanczos,setsar=1[z{k}]")
-            fc.append(f"[{v}][z{k}]overlay=0:0:enable='{en}'[vz{k}]")
-            v = f"vz{k}"
+    zooms = sorted(tl.get("zooms", []), key=lambda z: z["start"])
+    if zooms:
+        # Per-frame upscale by the eased factor, then crop back to W x H around the face
+        # (face slightly above the crop centre). The crop offset follows the scaled size.
+        s = zoom_expr(zooms)
+        fx, fy = center
+        fc.append(f"[{v}]scale=w='2*trunc({W}*{s}/2)':h='2*trunc({H}*{s}/2)':eval=frame:flags=bicubic,"
+                  f"crop={W}:{H}:'min(max({fx}*iw-{W / 2},0),iw-{W})':'min(max({fy}*ih-{0.42 * H},0),ih-{H})',"
+                  f"setsar=1[vz]")
+        v = "vz"
 
     idx = 1
     for a in sorted(tl.get("animations", []), key=lambda a: a["start"]):
