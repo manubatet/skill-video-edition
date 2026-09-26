@@ -31,7 +31,8 @@ from PIL import Image, ImageDraw, ImageFont
 
 STYLE_DEFAULTS = {"font": "Montserrat", "text": "#FFFFFF", "highlight": "#FFD400", "emphasis": "#00E676",
                   "outline": "#000000", "accent": "#FFD400", "accent_text": "#111111",
-                  "panel": "#111111", "panel_text": "#FFFFFF"}
+                  "panel": "#111111", "panel_text": "#FFFFFF", "danger": "#FF3B3B",
+                  "anim_style": "bold"}
 
 
 def load_style(work="work"):

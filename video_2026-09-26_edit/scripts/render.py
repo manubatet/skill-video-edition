@@ -52,7 +52,7 @@ def validate(tl, tr, anims_meta, rules):
     for z in zooms:
         if z["end"] - z["start"] < rules["zoom_min_len"]:
             errs.append(f"zoom {z['start']}-{z['end']} shorter than {rules['zoom_min_len']}s")
-        if z.get("ramp", 0.35) < 0:
+        if z.get("ramp", 0.7) < 0:
             errs.append(f"zoom {z['start']} ramp must be >= 0")
         if not (1.0 < z.get("scale", 1.15) <= rules["zoom_max_scale"]):
             errs.append(f"zoom {z['start']} scale must be in (1, {rules['zoom_max_scale']}]")
@@ -127,7 +127,7 @@ def face_center(video, samples=15):
     return xs[len(xs) // 2], ys[len(ys) // 2]
 
 
-def zoom_expr(zooms, default_ramp=0.35):
+def zoom_expr(zooms, default_ramp=0.7):
     """FFmpeg expression for the zoom factor at time t: 1 outside zooms, eased (smoothstep)
     in over `ramp` s after start, held, eased out over `ramp` s before end. Gradual
     push-ins instead of hard cuts; "ramp": 0 restores the hard punch-in."""

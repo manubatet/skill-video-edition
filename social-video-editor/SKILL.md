@@ -41,9 +41,11 @@ The pipeline needs Python 3.9+, FFmpeg built with libass, and a machine that can
 
 If a model download is blocked (sandboxed or offline machine), say so plainly. Ask the user to run the transcription step on their own machine, or to provide the `transcript.json`.
 
-## Intake: ask once, all together
+## Intake: two quick rounds
 
-Ask these with AskUserQuestion in **one** call. The recommended option comes first. If nobody answers, use the defaults and state them.
+Ask with AskUserQuestion. The recommended option comes first. If nobody answers, use the defaults and state them. AskUserQuestion takes at most 4 questions and 4 options per question, and it always adds a free-text "Other". So the intake runs in two calls, back to back, before any heavy work starts.
+
+### Round 1: what to add
 
 1. **Captions**: Karaoke, 3 words with the current word highlighted (recommended) / One word at a time / Phrases / No captions.
 2. **Caption position**: Bottom, above the platform UI (recommended) / Middle / Top.
@@ -53,6 +55,24 @@ Ask these with AskUserQuestion in **one** call. The recommended option comes fir
 In the same message, also invite:
 - a **glossary**: names, brands and anglicisms Whisper might misspell. Pass it to `--glossary`.
 - **anything else to add**: an open line such as "¿Hay algo más que quieras añadir o que deba tener en cuenta?". Treat whatever comes back, here or in "Other", as a requirement. Plan it in the proposal table (Checkpoint 1) like any other effect.
+
+### Round 2: style guide (right after round 1)
+Ask this round when captions or animations are on. Skip it only when both are off.
+
+5. **Animation style**: ask only if Animations was selected. Single choice. The question text must invite a custom style in "Other", for example: "¿Qué estilo quieres para las animaciones? Si ninguno encaja, descríbelo en 'Other' (referencias, marcas, cuentas que te gusten…)." Offer the four presets from *Animation style presets*, with the one that best fits the video's tone first as "(Recommended)":
+   - **Tarjetas bold**: pills sólidas, rebote, tipografía gruesa en mayúsculas.
+   - **Minimal limpio**: líneas finas, fundidos y deslizamientos suaves, sin rebote.
+   - **Flat 2D ilustrado**: iconos y personajes simples de colores planos.
+   - **Neón tech**: fondo oscuro, bordes brillantes, entradas rápidas.
+6. **Color palette (style guide)**: single choice. Offer the four presets from *Color palette presets*. Put the five HEX codes in each option's `description`, so the user sees the actual colours. Put the preset that best fits the video's topic first as "(Recommended)". The question text must explain the "Other" format, for example: "¿Qué paleta de colores usamos? Si tienes la tuya, escribe en 'Other' hasta 5 colores HEX en este orden: fondo, texto, principal, secundario, alerta (p. ej. #1E3A4C, #F7F5F0, #5EC2B7, #F4A261, #E76F51)."
+
+Custom answers:
+- **Custom style:** a free-text style becomes `style.anim_style`, holding the user's description. Derive its motion and shape rules from the nearest preset and state them at Checkpoint 1.
+- **Custom palette:** for HEX codes, accept `#RGB`, `#RRGGBB` or codes without `#`, separated by commas or spaces. Map them in order to the five roles.
+  - With fewer than 5 colours, fill the missing roles from the closest preset.
+  - With more than 5 colours, use the first 5 and say so.
+  - With an invalid code, ask again only for that value.
+  - Colour names ("azul marino") are also accepted: convert them to HEX and show the codes you chose.
 
 ## Workflow
 
@@ -82,7 +102,7 @@ Show the user three things:
 
   Under the table add:
   - one line on **where** the animations sit (the free area of the frame and the box size), and why it avoids the face and any burned-in text;
-  - one line on the **look** (style tokens, font, entry/hold/exit);
+  - one line on the **look**: the chosen palette (key and its 5 HEX codes), the `anim_style` row, the font and the entry/hold/exit timing;
   - when zooms or emphasis words are on, a short list of the sentences that get a zoom and the words that get highlighted.
 
   Offer optional extras as a separate "Opcional" line instead of silently adding them.
@@ -129,11 +149,12 @@ Deliver `work/final.mp4`. Also give the extras in the reply, derived from the tr
 {
   "style": {"font": "Montserrat", "text": "#FFFFFF", "highlight": "#FFD400", "emphasis": "#00E676",
             "outline": "#000000", "accent": "#FFD400", "accent_text": "#111111",
-            "panel": "#111111", "panel_text": "#FFFFFF"},
+            "panel": "#111111", "panel_text": "#FFFFFF", "danger": "#FF3B3B",
+            "palette": "energia", "anim_style": "bold"},
   "captions": {"mode": "karaoke", "position": "bottom", "uppercase": true, "max_words": 3, "size": 0.07},
   "classification": [{"sentence": 0, "role": "hook", "importance": "high", "why": "promete 3 claves"}],
   "emphasis_words": [6, 7, 32],
-  "zooms": [{"start": 4.72, "end": 6.58, "scale": 1.15, "ramp": 0.35}],
+  "zooms": [{"start": 4.72, "end": 6.58, "scale": 1.15, "ramp": 0.7}],
   "sfx": [{"at": 5.0, "sound": "whoosh", "gain_db": -10}],
   "animations": [{"id": "a1", "file": "work/anims/a1.mov", "start": 2.15, "anchor": "upper-third",
                   "hide_captions": false}],
@@ -148,7 +169,7 @@ Field notes:
 - **`sfx.at`**: the moment the sound should *land*. `render.py` subtracts each sound's lead time automatically, for example 0.22 s for `whoosh` and 1.2 s for `riser`. Set `"align": "start"` to disable this.
 - **Available sounds**: `whoosh` (transitions, new point), `pop` (a word or card appears), `ding` (number or result), `click` (list item), `riser` (build-up before a reveal), `boom` (big claim, use at most once per video).
 - **`animations.anchor`**: `top` | `upper-third` | `center` | `lower-third`. Alternatively give explicit `x` and `y` in pixels for the top-left corner. Use `hide_captions: true` when an animation replaces the captions for its duration.
-- **`zooms`**: every zoom is a **gradual push-in**, never a hard cut. The scale eases in (smoothstep) over `ramp` seconds from `start`, holds, then eases back out over `ramp` seconds before `end`. The default `ramp` is 0.35 s, capped at half the zoom length. Keep the default for emphasis. Use 0.5–0.8 for a slow, calm push on story sentences. `"ramp": 0` gives the old hard punch-in, so use it only when the user asks for jump-cut style. Because the ramp eats into the zoom, start it about `ramp`/2 before the key word, so the zoom is fully in when the word lands.
+- **`zooms`**: every zoom is a **gradual push-in**, never a hard cut. The scale eases in (smoothstep) over `ramp` seconds from `start`, holds, then eases back out over `ramp` seconds before `end`. The default `ramp` is **0.7 s**, capped at half the zoom length. Keep the default; lower it (0.35) only when the user asks for a snappier style. `"ramp": 0` gives the old hard punch-in, so use it only when the user asks for jump-cut style. Because the ramp eats into the zoom, start it about `ramp`/2 (≈0.3 s) before the key word, so the zoom is fully in when the word lands. Make zooms at least 1.4 s long, so both full ramps fit. Shorter ones never reach full scale and read as a quick breathe-in.
 - **`zoom_center`**: leave it `null`. It is detected from the face, falling back to `[0.5, 0.4]`. Set it by hand when the source has burned-in text that the zoom would cut in half. Choose a centre whose crop either keeps that text whole or leaves it out entirely.
 - **`rules`**: overrides the density limits in `render.py` (`RULES`). Change a limit only when the user asks for a denser or calmer style.
 
@@ -197,7 +218,8 @@ Each animation is one Python file using `scripts/anim_kit.py`. It renders to a t
 Design rules:
 - Duration 1.2–2.5 s, with three phases: **entry** 0.25–0.4 s (`out_back` for pop, `out_cubic` for slide), **hold**, **exit** 0.2–0.3 s (`in_cubic` fade or shrink).
 - At most 4 words of text, drawn large. Motion supports the speech; it never competes with it.
-- Colors come only from `load_style()`. This is what makes a v2 style guide work without code changes.
+- Colors come only from `load_style()`: tokens `accent`, `accent_text`, `panel`, `panel_text`, `text`, `emphasis`, `highlight`, `danger`. Never hard-code a HEX in an animation. This is what lets the palette chosen at intake restyle everything without code changes.
+- Motion and shape follow `style.anim_style` (see *Animation style presets* below).
 - No emoji or bitmap logos (fonts render them unreliably). Draw simple icons from primitives: a check mark is a `line`, a progress ring is an `arc`, an arrow is a `line` with a head.
 - Proven patterns:
   - keyword card (pill plus word, pop-in);
@@ -226,6 +248,43 @@ def frame(c, t):
 anim.render("work/anims/a1.mov"); anim.sheet("work/anims/a1_sheet.png")
 ```
 
+## Animation style presets
+
+The intake answer is stored in `style.anim_style`. Every animation in the video follows the same row. The proven patterns above work in every style; only their motion and shapes change.
+
+| Preset (`anim_style`) | Entry / exit | Shapes | Text | Idle motion |
+|---|---|---|---|---|
+| `bold`: Tarjetas bold (default) | `out_back` pop 0.3 s from scale 0.5; exit `in_cubic` shrink and fade 0.25 s | solid `accent` pills or `panel` at alpha 0.85, radius 40–48 | ExtraBold, UPPERCASE, as large as fits | none; the hold is still |
+| `minimal`: Minimal limpio | `out_cubic` fade plus 12–20 px slide, 0.4 s; no overshoot; exit a plain fade 0.3 s | thin lines (width 3–4) and outlines, `panel` alpha ≤ 0.6 or no panel, radius 10–14 | regular or bold weight, sentence case, 20–30 % smaller than bold | none |
+| `flat2d`: Flat 2D ilustrado | `out_back` with a small overshoot, 0.35 s; elements stagger by 0.1–0.15 s | icons and characters built from primitives, flat fills, no outlines, soft background shapes | bold, sentence case, short labels | gentle wiggle or bob (1–3 px, `sin(t·k)`), blinking eyes, walk cycles; best for full-screen scenes |
+| `neon`: Neón tech | fast `out_quint` slide 0.2 s from off-box; exit a fast slide out | dark `panel` alpha 0.9; `accent` outline width 3 plus glow (2–3 wider outlines at alpha 0.25 → 0.08) | ExtraBold UPPERCASE, `accent` or `text` colour | subtle glow pulse (alpha ±0.1 at 1–2 Hz) |
+
+For a free-text style, pick the nearest row and adapt it. At Checkpoint 1, name the row and write one line on what you changed.
+
+## Color palette presets
+
+Each palette has 5 colours with fixed roles: **fondo** (dark base), **texto** (light), **principal**, **secundario**, **alerta**. They map to the `style` tokens like this:
+- `panel` and `accent_text` = fondo;
+- `text` and `panel_text` = texto;
+- `accent` and `highlight` = principal;
+- `emphasis` = secundario;
+- `danger` = alerta;
+- `outline` = `#000000`, always, so captions stay readable on any footage.
+
+Also set `style.palette` to the preset's key, or to `"custom"`.
+
+| Key | Option label | fondo | texto | principal | secundario | alerta | Fits |
+|---|---|---|---|---|---|---|---|
+| `energia` | Energía (amarillo) | `#111111` | `#FFFFFF` | `#FFD400` | `#00E676` | `#FF3B3B` | tips, motivación, negocio; the default |
+| `calma` | Calma (salud) | `#1E3A4C` | `#F7F5F0` | `#5EC2B7` | `#F4A261` | `#E76F51` | salud, psicología, bienestar, educación |
+| `pop` | Pop (rosa y violeta) | `#1A1033` | `#FFFFFF` | `#FF4FA3` | `#7C5CFF` | `#FFD23F` | lifestyle, moda, belleza, entretenimiento |
+| `tierra` | Tierra (elegante) | `#2B2622` | `#FAF6F0` | `#D9B26F` | `#8DB38B` | `#C4553A` | gastronomía, viajes, marca personal premium |
+
+All four keep at least 3:1 WCAG contrast for every role on `fondo`, and at least 4.5:1 for texto and principal. With a custom palette:
+- Check the same contrasts.
+- If principal on fondo is below 3:1, use texto as `accent_text` instead of fondo, and tell the user.
+- If texto on fondo is below 4.5:1, warn the user and propose the nearest fix.
+
 ## QA checklist (preview and QA sheet)
 
 - Captions are readable and never cover the face or an animation. Keywords are highlighted.
@@ -250,7 +309,7 @@ anim.render("work/anims/a1.mov"); anim.sheet("work/anims/a1_sheet.png")
 ## Roadmap hooks (don't build unless asked)
 
 v2 items, in the PRD, fit into the existing contracts without rewrites:
-- **Style guide** → `timeline.style` plus pattern presets.
+- **Style guide** → `timeline.style` (palette and animation-style presets exist; a full brand guide would extend them).
 - **Templates** → preset `timeline.rules` and effect toggles.
 - **Format / auto-reframe** → a crop pass in `build_edit.py`.
 - **Combining videos** → multiple sources in `segments.json`.
@@ -279,7 +338,7 @@ Existing auto-editors are closed SaaS products, work poorly in Spanish, and deco
 
 **Non-goals (v1).** Filler-word removal (explicitly rejected). Multi-camera editing. Background music. Auto-reframing between aspect ratios. Combining videos. Stock B-roll. Languages other than Spanish.
 
-**User flow.** Upload video → 4 quick questions → transcript and cut review → preview with QA → final video plus title, description, hashtags and thumbnail picks.
+**User flow.** Upload video → two short question rounds (effects, then style guide: animation style and colour palette) → transcript and cut review → preview with QA → final video plus title, description, hashtags and thumbnail picks.
 
 **Functional requirements (v1).**
 
@@ -1012,7 +1071,8 @@ from PIL import Image, ImageDraw, ImageFont
 
 STYLE_DEFAULTS = {"font": "Montserrat", "text": "#FFFFFF", "highlight": "#FFD400", "emphasis": "#00E676",
                   "outline": "#000000", "accent": "#FFD400", "accent_text": "#111111",
-                  "panel": "#111111", "panel_text": "#FFFFFF"}
+                  "panel": "#111111", "panel_text": "#FFFFFF", "danger": "#FF3B3B",
+                  "anim_style": "bold"}
 
 
 def load_style(work="work"):
@@ -1410,7 +1470,7 @@ def validate(tl, tr, anims_meta, rules):
     for z in zooms:
         if z["end"] - z["start"] < rules["zoom_min_len"]:
             errs.append(f"zoom {z['start']}-{z['end']} shorter than {rules['zoom_min_len']}s")
-        if z.get("ramp", 0.35) < 0:
+        if z.get("ramp", 0.7) < 0:
             errs.append(f"zoom {z['start']} ramp must be >= 0")
         if not (1.0 < z.get("scale", 1.15) <= rules["zoom_max_scale"]):
             errs.append(f"zoom {z['start']} scale must be in (1, {rules['zoom_max_scale']}]")
@@ -1485,7 +1545,7 @@ def face_center(video, samples=15):
     return xs[len(xs) // 2], ys[len(ys) // 2]
 
 
-def zoom_expr(zooms, default_ramp=0.35):
+def zoom_expr(zooms, default_ramp=0.7):
     """FFmpeg expression for the zoom factor at time t: 1 outside zooms, eased (smoothstep)
     in over `ramp` s after start, held, eased out over `ramp` s before end. Gradual
     push-ins instead of hard cuts; "ramp": 0 restores the hard punch-in."""
