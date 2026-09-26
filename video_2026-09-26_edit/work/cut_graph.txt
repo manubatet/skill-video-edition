@@ -1,0 +1,12 @@
+[0:v]trim=start=0.3:end=14.9,setpts=PTS-STARTPTS[v0];
+[1:a]atrim=start=0.3:end=14.9,asetpts=PTS-STARTPTS,afade=t=in:d=0.012,afade=t=out:st=14.588:d=0.012[a0];
+[0:v]trim=start=15.1333:end=18.3,setpts=PTS-STARTPTS[v1];
+[1:a]atrim=start=15.1333:end=18.3,asetpts=PTS-STARTPTS,afade=t=in:d=0.012,afade=t=out:st=3.155:d=0.012[a1];
+[0:v]trim=start=18.6:end=20.1667,setpts=PTS-STARTPTS[v2];
+[1:a]atrim=start=18.6:end=20.1667,asetpts=PTS-STARTPTS,afade=t=in:d=0.012,afade=t=out:st=1.555:d=0.012[a2];
+[0:v]trim=start=20.3333:end=25.0333,setpts=PTS-STARTPTS[v3];
+[1:a]atrim=start=20.3333:end=25.0333,asetpts=PTS-STARTPTS,afade=t=in:d=0.012,afade=t=out:st=4.688:d=0.012[a3];
+[0:v]trim=start=25.2333:end=28.3667,setpts=PTS-STARTPTS[v4];
+[1:a]atrim=start=25.2333:end=28.3667,asetpts=PTS-STARTPTS,afade=t=in:d=0.012,afade=t=out:st=3.121:d=0.012[a4];
+[v0][a0][v1][a1][v2][a2][v3][a3][v4][a4]concat=n=5:v=1:a=1[vc][ac0];
+[ac0]afftdn=nf=-25,aresample=48000[ac]
