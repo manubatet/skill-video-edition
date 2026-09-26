@@ -52,6 +52,8 @@ def validate(tl, tr, anims_meta, rules):
     for z in zooms:
         if z["end"] - z["start"] < rules["zoom_min_len"]:
             errs.append(f"zoom {z['start']}-{z['end']} shorter than {rules['zoom_min_len']}s")
+        if z.get("ramp", 0.35) < 0:
+            errs.append(f"zoom {z['start']} ramp must be >= 0")
         if not (1.0 < z.get("scale", 1.15) <= rules["zoom_max_scale"]):
             errs.append(f"zoom {z['start']} scale must be in (1, {rules['zoom_max_scale']}]")
         if z["start"] < 0 or z["end"] > D + 0.05:
@@ -125,32 +127,37 @@ def face_center(video, samples=15):
     return xs[len(xs) // 2], ys[len(ys) // 2]
 
 
-def crop_for(scale, center, W, H):
-    cw, ch = int(W / scale) // 2 * 2, int(H / scale) // 2 * 2
-    fx, fy = center
-    x = min(max(fx * W - cw / 2, 0), W - cw)
-    y = min(max(fy * H - 0.42 * ch, 0), H - ch)  # face sits slightly above the crop centre
-    return cw, ch, int(x), int(y)
+def zoom_expr(zooms, default_ramp=0.35):
+    """FFmpeg expression for the zoom factor at time t: 1 outside zooms, eased (smoothstep)
+    in over `ramp` s after start, held, eased out over `ramp` s before end. Gradual
+    push-ins instead of hard cuts; "ramp": 0 restores the hard punch-in."""
+    terms = []
+    for z in zooms:
+        a, b, s = z["start"], z["end"], z.get("scale", 1.15)
+        r = min(max(z.get("ramp", default_ramp), 0.0), (b - a) / 2)
+        if r < 1e-3:
+            env = f"between(t,{a},{b - 0.001})"
+        else:
+            p_in, p_out = f"clip((t-{a})/{r:.3f},0,1)", f"clip(({b}-t)/{r:.3f},0,1)"
+            env = f"({p_in})*({p_in})*(3-2*({p_in}))*({p_out})*({p_out})*(3-2*({p_out}))"
+        terms.append(f"{s - 1:.4f}*{env}")
+    return "(1+" + "+".join(terms) + ")"
 
 
 def build_graph(tl, tr, anims_meta, sfx_dir, center, preview):
     W, H = tr["width"], tr["height"]
     inputs, fc = [], []
     v = "0:v"
-    zooms = tl.get("zooms", [])
-    by_scale = {}
-    for z in zooms:
-        by_scale.setdefault(round(z.get("scale", 1.15), 3), []).append(z)
-    if by_scale:
-        outs = "".join(f"[zsrc{k}]" for k in range(len(by_scale)))
-        fc.append(f"[{v}]split={len(by_scale) + 1}[vbase]{outs}")
-        v = "vbase"
-        for k, (s, zs) in enumerate(by_scale.items()):
-            cw, ch, x, y = crop_for(s, center, W, H)
-            en = "+".join(f"between(t,{z['start']},{z['end'] - 0.001})" for z in zs)
-            fc.append(f"[zsrc{k}]crop={cw}:{ch}:{x}:{y},scale={W}:{H}:flags=lanczos,setsar=1[z{k}]")
-            fc.append(f"[{v}][z{k}]overlay=0:0:enable='{en}'[vz{k}]")
-            v = f"vz{k}"
+    zooms = sorted(tl.get("zooms", []), key=lambda z: z["start"])
+    if zooms:
+        # Per-frame upscale by the eased factor, then crop back to W x H around the face
+        # (face slightly above the crop centre). The crop offset follows the scaled size.
+        s = zoom_expr(zooms)
+        fx, fy = center
+        fc.append(f"[{v}]scale=w='2*trunc({W}*{s}/2)':h='2*trunc({H}*{s}/2)':eval=frame:flags=bicubic,"
+                  f"crop={W}:{H}:'min(max({fx}*iw-{W / 2},0),iw-{W})':'min(max({fy}*ih-{0.42 * H},0),ih-{H})',"
+                  f"setsar=1[vz]")
+        v = "vz"
 
     idx = 1
     for a in sorted(tl.get("animations", []), key=lambda a: a["start"]):
