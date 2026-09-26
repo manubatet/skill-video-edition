@@ -1,5 +1,8 @@
+[0:v]split=2[vbase][zsrc0];
+[zsrc0]crop=652:368:196:0,scale=848:480:flags=lanczos,setsar=1[z0];
+[vbase][z0]overlay=0:0:enable='between(t,0.0,3.289)+between(t,9.78,12.229000000000001)+between(t,16.0,17.839)+between(t,19.42,20.599)+between(t,22.64,25.788999999999998)'[vz0];
 [1:v]format=rgba,setpts=PTS-STARTPTS+0.05/TB[an1];
-[0:v][an1]overlay=505:140:eof_action=pass:format=auto[va1];
+[vz0][an1]overlay=505:140:eof_action=pass:format=auto[va1];
 [2:v]format=rgba,setpts=PTS-STARTPTS+4.5/TB[an2];
 [va1][an2]overlay=505:140:eof_action=pass:format=auto[va2];
 [3:v]format=rgba,setpts=PTS-STARTPTS+13.7/TB[an3];
@@ -7,6 +10,5 @@
 [4:v]format=rgba,setpts=PTS-STARTPTS+25.7/TB[an4];
 [va3][an4]overlay=505:140:eof_action=pass:format=auto[va4];
 [va4]ass=filename=captions.ass:fontsdir=fonts[vcap];
-[vcap]scale=-2:540:flags=bilinear[vprev];
-[vprev]format=yuv420p[vout];
+[vcap]format=yuv420p[vout];
 [0:a]anull[aout]
