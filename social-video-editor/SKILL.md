@@ -46,6 +46,20 @@ The procedure needs four abilities. Each can be done in more than one way, depen
 
 Never skip a checkpoint because a tool is missing. Use the fallback instead.
 
+## Check for updates (once per run)
+
+Before Setup, do one simple, non-blocking check:
+
+```bash
+LOCAL=$(cat VERSION 2>/dev/null || echo unknown)
+REMOTE=$(curl -s --max-time 3 https://api.github.com/repos/manubatet/skill-video-edition/commits/main | grep -m1 '"sha"' | cut -d'"' -f4 | cut -c1-7)
+echo "local=$LOCAL remote=${REMOTE:-unreachable}"
+```
+
+- No network, or `curl` fails: skip silently and continue. This never blocks the run.
+- `REMOTE` differs from `LOCAL`: say so in one line, for example "Tu skill social-video-editor no está actualizada (local `81108d2`, remoto `a1b2c3d`). Actualízala desde https://github.com/manubatet/skill-video-edition (`git pull` si trabajas dentro del repo, o vuelve a copiar/descargar la carpeta `social-video-editor/` si la usas suelta)." Then continue normally; do not wait for the user to update.
+- If this skill folder is itself a checkout of that repo (`.git` present and `git remote -v` shows `skill-video-edition`), prefer `git fetch origin -q && git rev-list --count HEAD..origin/main` — a non-zero count means updates are available, and `git pull --ff-only` applies them.
+
 ## Runtime profiles
 
 Check the environment first with one command:
@@ -68,7 +82,7 @@ Then pick the profile that matches:
 
 The pipeline needs Python 3.9+, FFmpeg built with libass, and a machine that can download the Whisper models from Hugging Face. A GPU is optional: CPU with int8 works but is slower. On Apple Silicon, WhisperX runs on CPU.
 
-1. Create a project folder next to the video: `<video-name>_edit/`. Every command below runs from inside that folder.
+1. **Project management: one folder per project.** Create a project folder named `<video-name>_edit/` **inside the current working directory** (where the agent is running), not next to the source video if that file lives elsewhere (Downloads, a temp upload path, etc.) — copy or symlink the video into the project folder instead. This folder holds everything for that project: the video, `scripts/`, `work/` (transcript, edit decisions, timeline, renders) and any extras. Every command below runs from inside that folder. If a folder with that name already exists for a different video, ask the user for a project name rather than overwriting it. Never mix two projects' `work/` in the same folder.
 2. Copy this skill's `scripts/` folder (next to this `SKILL.md`) into `<project>/scripts/`. Do not rewrite the scripts.
 3. Install and check the dependencies:
    ```bash
