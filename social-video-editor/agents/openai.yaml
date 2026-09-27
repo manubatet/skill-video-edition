@@ -1,0 +1,8 @@
+# Optional UI metadata for ChatGPT and Codex. Claude ignores this file.
+interface:
+  display_name: "Social Video Editor (ES)"
+  short_description: "Edita vídeos de cabeza parlante en español para redes: cortes, subtítulos, zooms, SFX y animaciones."
+  brand_color: "#FFD400"
+  default_prompt: "Edita este vídeo para redes sociales con el skill social-video-editor."
+policy:
+  allow_implicit_invocation: true

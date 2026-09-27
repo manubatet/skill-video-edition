@@ -1,4 +1,4 @@
-"""Tiny animation kit: Claude writes an animation as Python code, this renders it to a
+"""Tiny animation kit: the agent writes an animation as Python code, this renders it to a
 transparent .mov (PNG codec, alpha) that render.py overlays on the video.
 
 Example (work/anims/a1.py):
@@ -16,7 +16,7 @@ Example (work/anims/a1.py):
             c.text("3 CLAVES", 450, 150, 110, S["accent_text"])
 
     anim.render("work/anims/a1.mov")      # transparent video
-    anim.sheet("work/anims/a1_sheet.png")  # 5 frames on a checkerboard, to inspect with Read
+    anim.sheet("work/anims/a1_sheet.png")  # 5 frames on a checkerboard, to inspect visually
 
 Coordinates are output pixels inside the animation box (w x h); drawing is 2x
 supersampled for smooth edges. The kit only uses Pillow + numpy + FFmpeg.
