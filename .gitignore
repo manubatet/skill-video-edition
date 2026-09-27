@@ -1,2 +1,8 @@
 __pycache__/
 *.pyc
+
+# Video projects (media, transcripts, per-video decisions) stay local, never on GitHub
+*_edit/
+*.mp4
+*.mov
+*.mkv

@@ -1,8 +1,0 @@
-{
-  "remove_sentences": [],
-  "remove_words": [],
-  "max_gap": 0.40,
-  "pad": 0.12,
-  "denoise": "light",
-  "loudness": -14
-}

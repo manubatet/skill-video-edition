@@ -42,7 +42,6 @@ social-video-editor/          ← el skill (lo que se instala)
 └── agents/openai.yaml        ← metadatos opcionales para ChatGPT / Codex
 .claude/skills/social-video-editor  → enlace para Claude Code
 .agents/skills/social-video-editor  → enlace para Codex
-video_2026-09-26_edit/        ← proyecto de ejemplo (v1, v2, v3)
 ```
 
 ## Instalación
@@ -97,19 +96,34 @@ python scripts/render.py --work work
 
 Los esquemas de `edit.json` y `timeline.json` están documentados en `social-video-editor/SKILL.md` y en el docstring de `build_edit.py`.
 
-## Proyecto de ejemplo
+## Próximos pasos
 
-`video_2026-09-26_edit/` contiene una edición real de 28,5 s, que queda en 27,2 s tras los cortes:
+**Validación**
+- [ ] Probar el skill de principio a fin en **ChatGPT** y en **Codex**:
+  - la instalación del `.zip`;
+  - las preguntas sin herramienta de opciones;
+  - el perfil sin red.
+- [ ] Añadir tests automáticos de los scripts, sobre un vídeo sintético corto:
+  - `build_edit.py`: cortes y re-temporización;
+  - `captions.py`: agrupado y colores;
+  - `render.py --check`: reglas de ritmo;
+  - el cálculo de la expresión de zoom.
+- [ ] CI que ejecute esos tests y publique el `.zip` del skill en cada *release*.
 
-| Versión | Qué añade |
-|---|---|
-| **v1** | 4 animaciones: check "SÍ", escalera "Exposición gradual", aspa sobre "Pensamientos negativos" y barra "Poco a poco" |
-| **v2** | v1 más una escena 2D a pantalla completa de 9 s: exposición gradual con terapeuta, escalones y un medidor de ansiedad que muestra la habituación |
-| **v3** | v1 más subtítulos palabra a palabra, 7 palabras clave resaltadas y 5 zooms graduales |
+**Funcionalidad (v1.5)**
+- [ ] Biblioteca de patrones de animación reutilizables, con parámetros (tarjeta, contador, lista, sello, barra), para cada estilo de animación.
+- [ ] Añadir "Escena 2D a pantalla completa" como opción de efecto en la primera ronda de preguntas.
+- [ ] Sugerencias de B-roll a partir de la transcripción.
+- [ ] Detectar subtítulos o títulos ya incrustados en el vídeo y adaptar automáticamente los subtítulos, los zooms y la colocación de las animaciones.
 
-Qué hay en el repositorio:
-- **Incluido:** los scripts, la transcripción, las decisiones de cada versión (`versions/timeline_vN.json`) y el código de las animaciones (`work/anims/*.py`).
-- **Excluido:** los archivos de vídeo, audio, fuentes e imágenes (`.gitignore`).
+**Funcionalidad (v2)**
+- [ ] Formatos de salida y reencuadre automático (16:9 → 9:16) siguiendo la cara.
+- [ ] Plantillas de edición (solo animaciones, animaciones y énfasis, con o sin SFX).
+- [ ] Guía de estilo de marca completa (tipografías, logos, animaciones propias) sobre las paletas actuales.
+- [ ] Combinar varios vídeos en una sola edición.
+- [ ] Música de fondo que baje de volumen cuando se habla (*ducking*) y cortes al ritmo, con librosa.
+- [ ] Extraer clips de vídeos largos.
+- [ ] Subtítulos en inglés y soporte para otros idiomas.
 
 ## Licencias de terceros
 

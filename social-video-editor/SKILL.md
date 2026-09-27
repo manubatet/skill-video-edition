@@ -136,7 +136,7 @@ Show the user three things:
 
 | # | Momento | Frase | Animación | Por qué |
 |---|---|---|---|---|
-| a1 | 0,1 s → 1,6 s | "**Sí**, se puede superar" | **Sello de check**: círculo verde con rebote, ✓ que se dibuja trazo a trazo, "SÍ" debajo | Gancho: responde a la pregunta en el primer segundo |
+| a1 | 2,1 s → 3,9 s | "Hoy te doy **tres claves** para…" | **Tarjeta de palabra**: pill del color principal con rebote, "3 CLAVES" en mayúsculas | Gancho: anuncia la estructura del vídeo en los primeros 3 s |
 
   Column rules:
   - **Momento** is in source seconds at this stage; say that times shift slightly after the cuts.
