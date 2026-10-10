@@ -7,8 +7,11 @@ Usage:
   python render.py --work work/ --preview --sheet  # also write work/qa_sheet.jpg (frames at every cue)
 
 Inputs: work/cut.mkv, work/transcript_edited.json, work/timeline.json, sfx/*.wav, work/voice/*.wav
+timeline.extend (s) holds the last frame and pads silence after the cut, for full-screen scenes
+with voice-over; voice-overs with work/voice/<id>.words.json (align_voice.py) are captioned.
 """
 import argparse
+import json
 import sys
 from pathlib import Path
 
@@ -46,6 +49,28 @@ def voiceovers(tl, work):
             die(f"voiceover {v['id']}: clip missing or out of date; run voice_clone.py first")
         out.append({**v, "file": clip, "duration": wav_duration(clip)})
     return out
+
+
+def caption_words(tr, vos, work):
+    """Speech words plus aligned voice-over words (offset to `at`). Speech under a muted
+    voice-over (duck_db <= -40) is dropped so the two never caption at once."""
+    muted = [(v["at"], v["at"] + v["duration"]) for v in vos if v.get("duck_db", -24) <= -40]
+    words = [w for w in tr["words"] if not any(a < w["end"] and w["start"] < b for a, b in muted)]
+    for n, v in enumerate(vos):
+        p = work / "voice" / f"{v['id']}.words.json"
+        if not p.exists() or load(p).get("text") != v.get("text", "").strip():
+            print(f"WARN: voiceover {v['id']} has no captions (run align_voice.py)")
+            continue
+        for k, w in enumerate(load(p)["words"]):
+            words.append({"i": 1_000_000 + 1000 * n + k, "text": w["text"], "sentence": f"vo:{v['id']}",
+                          "start": round(v["at"] + w["start"], 3), "end": round(v["at"] + w["end"], 3)})
+    return sorted(words, key=lambda w: w["start"])
+
+
+def lufs(path):
+    """Integrated loudness of a clip (EBU R128), as build_edit.py measures the speech."""
+    p = run(["ffmpeg", "-i", str(path), "-af", "loudnorm=print_format=json", "-f", "null", "-"])
+    return float(json.loads(p.stderr[p.stderr.rindex("{"):p.stderr.rindex("}") + 1])["input_i"])
 
 
 def duck_expr(vos, ramp=0.12):
@@ -91,7 +116,7 @@ def validate(tl, tr, anims_meta, rules, vos=()):
 
     anims = sorted(tl.get("animations", []), key=lambda a: a["start"])
     cap = {**CAPTION_DEFAULTS, **tl.get("captions", {})}
-    cap_y = anchor_xy(cap["position"], W, H)[1]
+    cap_y = anchor_xy(cap["position"], W, H, cap.get("y"))[1]
     band = int(min(W, H) * cap["size"] * 1.3)
     for a in anims:
         m = anims_meta[a["id"]]
@@ -101,12 +126,15 @@ def validate(tl, tr, anims_meta, rules, vos=()):
         x, y, w, h = anim_box(a, m, W, H)
         if x < 0 or y < 0 or x + w > W or y + h > H:
             errs.append(f"animation {a['id']} box {x},{y},{w}x{h} leaves the frame")
+        if (w, h) == (W, H):
+            continue  # full-frame scene: covering the caption band and the UI zone is the point
         if cap["mode"] != "off" and not a.get("hide_captions") and y < cap_y + band and y + h > cap_y - band:
             warns.append(f"animation {a['id']} overlaps the caption band; move it or set hide_captions")
         if H > W and y + h > 0.80 * H:
             warns.append(f"animation {a['id']} enters the bottom 20% (platform UI zone)")
     for a, b in zip(anims, anims[1:]):
-        if b["start"] < a["start"] + anims_meta[a["id"]]["duration"] + rules["anim_min_gap"]:
+        # one frame of tolerance: rendered clips round their length up to whole frames
+        if b["start"] < a["start"] + anims_meta[a["id"]]["duration"] + rules["anim_min_gap"] - 1.0 / tr["fps"]:
             errs.append(f"animations {a['id']} and {b['id']} are closer than {rules['anim_min_gap']}s")
 
     for v in vos:
@@ -180,10 +208,16 @@ def zoom_expr(zooms, default_ramp=0.7):
     return "(1+" + "+".join(terms) + ")"
 
 
-def build_graph(tl, tr, anims_meta, sfx_dir, center, preview, vos=(), vo_gain=0.0):
+def build_graph(tl, tr, anims_meta, sfx_dir, center, preview, vos=(), target_lufs=-14):
     W, H = tr["width"], tr["height"]
     inputs, fc = [], []
-    v = "0:v"
+    v, a0 = "0:v", "0:a"
+    ext = tl.get("extend", 0)
+    if ext:
+        # exact 1/fps timebase first: cut.mkv uses 1 ms ticks, and 33 ms clones drift short
+        fc.append(f"[0:v]fps={tr['fps']},tpad=stop_mode=clone:stop={round(ext * tr['fps'])}[vext]")
+        fc.append(f"[0:a]apad=pad_dur={ext}[aext]")
+        v, a0 = "vext", "aext"
     zooms = sorted(tl.get("zooms", []), key=lambda z: z["start"])
     if zooms:
         # Per-frame upscale by the eased factor, then crop back to W x H around the face
@@ -213,13 +247,14 @@ def build_graph(tl, tr, anims_meta, sfx_dir, center, preview, vos=(), vo_gain=0.
     fc.append(f"[{v}]format=yuv420p[vout]")
 
     if vos:
-        fc.append(f"[0:a]volume='{duck_expr(vos)}':eval=frame[aduck]")
+        fc.append(f"[{a0}]volume='{duck_expr(vos)}':eval=frame[aduck]")
         alabels = ["[aduck]"]
     else:
-        alabels = ["[0:a]"]
+        alabels = [f"[{a0}]"]
     for vo in vos:
         inputs += ["-i", str(Path(vo["file"]).resolve())]
-        fc.append(f"[{idx}:a]aresample=48000,volume={vo_gain + vo.get('gain_db', 0):.2f}dB,"
+        gain = target_lufs - lufs(vo["file"]) + vo.get("gain_db", 0)  # same loudness as the speech
+        fc.append(f"[{idx}:a]aresample=48000,volume={gain:.2f}dB,"
                   f"adelay={int(vo['at'] * 1000)}:all=1[vo{idx}]")
         alabels.append(f"[vo{idx}]")
         idx += 1
@@ -279,6 +314,9 @@ def main():
     tr = load(work / "transcript_edited.json")
     tl = load(work / "timeline.json")
     rules = {**RULES, **tl.get("rules", {})}
+    if tl.get("extend", 0) < 0:
+        die("timeline.extend must be >= 0")
+    tr["duration"] = round(tr["duration"] + tl.get("extend", 0), 3)
     anims_meta = {}
     for a in tl.get("animations", []):
         if not Path(a["file"]).exists():
@@ -304,12 +342,12 @@ def main():
         tl["zoom_center"] = [round(center[0], 3), round(center[1], 3)]
         save(tl, work / "timeline.json")
         print(f"zoom centre = {tl['zoom_center']}")
-    (work / "captions.ass").write_text(build_ass(tr, tl), encoding="utf-8")
+    (work / "captions.ass").write_text(build_ass({**tr, "words": caption_words(tr, vos, work)}, tl), encoding="utf-8")
 
     seg_path = work / "segments.json"
-    vo_gain = load(seg_path).get("loudness_gain_db", 0.0) if vos and seg_path.exists() else 0.0
+    target = load(seg_path)["config"].get("loudness", -14) if seg_path.exists() else -14
     inputs, fc = build_graph(tl, tr, anims_meta, Path(args.sfx).resolve(), center or (0.5, 0.4), args.preview,
-                             vos, vo_gain)
+                             vos, target)
     (work / "render_graph.txt").write_text(";\n".join(fc), encoding="utf-8")
     out = work / ("preview.mp4" if args.preview else "final.mp4")
     enc = (["-c:v", "libx264", "-preset", "ultrafast", "-crf", "28"] if args.preview

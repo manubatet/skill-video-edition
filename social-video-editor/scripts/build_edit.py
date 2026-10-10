@@ -248,9 +248,6 @@ def main():
     run(["ffmpeg", "-y", "-i", str(raw), "-c:v", "copy", "-af", f"{ln},aresample=48000",
          "-c:a", "pcm_s16le", str(work / "cut.mkv")])
     raw.unlink(missing_ok=True)
-    # render.py applies the same gain to voice-overs so they sit at the level of the speech
-    save({"segments": segs, "config": cfg, "loudness_gain_db": round(lufs - float(m["input_i"]), 2)},
-         work / "segments.json")
 
     saved = t["duration"] - edited["duration"]
     print(f"OK: {len(segs)} segments, removed {len(removed)} words, "

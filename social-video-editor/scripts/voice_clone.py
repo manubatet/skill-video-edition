@@ -107,7 +107,11 @@ def build_ref(t, cfg, edit, work):
         s = next((s for s in t["sentences"] if s["id"] == sid), None)
         if s:
             excluded.update(s["words"])
-    span = cfg["ref"] or pick_ref(t, excluded)
+    patched = set()
+    for p in edit.get("voice_patches", []):
+        patched.update(range(p["words"][0], p["words"][1] + 1))
+    # prefer speech that stays in the edit; fall back to cut material (the voice is the same)
+    span = cfg["ref"] or pick_ref(t, excluded) or pick_ref(t, patched)
     if not span:
         die(f"no {REF_MIN:.0f}+ s stretch of clean continuous speech found; set voice.ref = [start, end] by hand")
     a, b = max(0.0, span[0] - 0.1), min(t["duration"], span[1] + 0.1)

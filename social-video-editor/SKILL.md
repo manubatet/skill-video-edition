@@ -97,7 +97,7 @@ The pipeline needs Python 3.9+, FFmpeg built with libass, and a machine that can
    - **Better denoising.** `pip install deepfilternet`, then set `"denoise": "deepfilter"`.
    - **Caption font.** Put a bold TTF (default: Montserrat ExtraBold, OFL license) in `work/fonts/`. Set `style.font` to the font's family name. Without it, captions fall back to a system font.
    - **Better SFX.** Any `.wav` placed in `sfx/` with the same name (for example a CC0 `whoosh.wav` from Freesound) replaces the synthesized one.
-   - **Voice cloning.** `pip install chatterbox-tts` (Chatterbox Multilingual, MIT). It pins its own `torch`; if that clashes with WhisperX, install it in a separate venv (`python3 -m venv .venv-voice`) and run only `voice_clone.py` from there. The first run downloads the model from Hugging Face. It runs on CUDA, Apple MPS or CPU (CPU takes a few seconds per line). Install it only when the user wants a voice fix.
+   - **Voice cloning.** `pip install chatterbox-tts "setuptools<80"` (Chatterbox Multilingual, MIT; its watermarker still imports `pkg_resources`, which newer setuptools removed). Use Python 3.10–3.12. It pins its own `torch`; if that clashes with WhisperX, install it in a separate venv (`python3 -m venv .venv-voice`) and run only `voice_clone.py` from there. The first run downloads the model from Hugging Face. It runs on CUDA, Apple MPS or CPU (CPU takes a few seconds per line). Install it only when the user wants a voice fix.
 
 If a model download is blocked (sandboxed or offline machine), switch to runtime profile 2.
 
@@ -181,7 +181,7 @@ python scripts/build_edit.py --work work
 This writes `work/cut.mkv` (cuts, light denoise, two-pass loudness normalization to -14 LUFS), `work/segments.json` and `work/transcript_edited.json/.txt`. Report the before and after duration.
 
 ### 4. Classify and plan effects
-Read `transcript_edited.json`. Then write `work/timeline.json` (schema below), following *Editorial rules* and the table approved at Checkpoint 1. Include the `classification` array: it documents the reasoning and makes later changes easy to discuss. If an approved row cannot be placed as agreed (for example two animations now violate `anim_min_gap`), show the updated table and say what changed. If the plan has `voiceover` entries, run `voice_clone.py` again now: it only generates the new lines.
+Read `transcript_edited.json`. Then write `work/timeline.json` (schema below), following *Editorial rules* and the table approved at Checkpoint 1. Include the `classification` array: it documents the reasoning and makes later changes easy to discuss. If an approved row cannot be placed as agreed (for example two animations now violate `anim_min_gap`), show the updated table and say what changed. If the plan has `voiceover` entries, run `voice_clone.py` again now: it only generates the new lines. Then run `python scripts/align_voice.py --work work` in the WhisperX environment, so the voice-overs get captions.
 
 ### 5. Code the animations
 For each entry in `animations`, write `work/anims/<id>.py` using `anim_kit` (see *Animation guide*). Run it. Then **open the generated `<id>_sheet.png` and look at it** (*Look at images*) before continuing. Fix overflowing text, clipped shapes, unreadable contrast and timing that looks wrong.
@@ -222,6 +222,7 @@ Deliver `work/final.mp4`. Also give the extras in the reply, derived from the tr
   "animations": [{"id": "a1", "file": "work/anims/a1.mov", "start": 2.15, "anchor": "upper-third",
                   "hide_captions": false}],
   "voiceover": [{"id": "v1", "at": 18.2, "text": "Y guarda este vídeo para luego.", "duck_db": -24, "gain_db": 0}],
+  "extend": 0,
   "zoom_center": null,
   "rules": {}
 }
@@ -229,20 +230,21 @@ Deliver `work/final.mp4`. Also give the extras in the reply, derived from the tr
 
 Field notes:
 - **`captions.mode`**: `karaoke` | `word` | `sentence` | `off`.
-- **`captions.position`**: `bottom` | `middle` | `top`. Positions already respect the TikTok and Reels safe zones for vertical video.
+- **`captions.position`**: `bottom` | `middle` | `top`. Positions already respect the TikTok and Reels safe zones for vertical video. For an in-between height, set `captions.y` (0–1 of the frame height, e.g. 0.64 for "middle, a bit lower"); it overrides `position`. Keep it above 0.80 on vertical video.
 - **`sfx.at`**: the moment the sound should *land*. `render.py` subtracts each sound's lead time automatically, for example 0.22 s for `whoosh` and 1.2 s for `riser`. Set `"align": "start"` to disable this.
 - **Available sounds**: `whoosh` (transitions, new point), `pop` (a word or card appears), `ding` (number or result), `click` (list item), `riser` (build-up before a reveal), `boom` (big claim, use at most once per video).
 - **`animations.anchor`**: `top` | `upper-third` | `center` | `lower-third`. Alternatively give explicit `x` and `y` in pixels for the top-left corner. Use `hide_captions: true` when an animation replaces the captions for its duration.
 - **`zooms`**: every zoom is a **gradual push-in**, never a hard cut. The scale eases in (smoothstep) over `ramp` seconds from `start`, holds, then eases back out over `ramp` seconds before `end`. The default `ramp` is **0.7 s**, capped at half the zoom length. Keep the default; lower it (0.35) only when the user asks for a snappier style. `"ramp": 0` gives the old hard punch-in, so use it only when the user asks for jump-cut style. Because the ramp eats into the zoom, start it about `ramp`/2 (≈0.3 s) before the key word, so the zoom is fully in when the word lands. Make zooms at least 1.4 s long, so both full ramps fit. Shorter ones never reach full scale and read as a quick breathe-in.
 - **`zoom_center`**: leave it `null`. It is detected from the face, falling back to `[0.5, 0.4]`. Set it by hand when the source has burned-in text that the zoom would cut in half. Choose a centre whose crop either keeps that text whole or leaves it out entirely.
-- **`voiceover`**: a line in the speaker's cloned voice, starting at `at`. The speech track is ducked by `duck_db` (default -24; -60 mutes it) while it plays. The clip must already exist (`voice_clone.py`), and it must end inside the video. It is not captioned, so show its text in an animation if it matters. See *Voice cloning*.
+- **`voiceover`**: a line in the speaker's cloned voice, starting at `at`. The speech track is ducked by `duck_db` (default -24; -60 mutes it) while it plays. The clip must already exist (`voice_clone.py`), and it must end inside the video. It is captioned like the speech once `align_voice.py` has aligned its words; speech under a muted voice-over (`duck_db` ≤ -40) is left out of the captions. See *Voice cloning*.
+- **`extend`**: seconds added after the end of the cut (the last frame is held and silence is padded) for full-screen animated scenes narrated by `voiceover`, for example a segment that explains an article after the speaker's real intro. Cover the whole extension with opaque full-screen animations (box = frame size, `x: 0, y: 0`); scenes may run back to back, so set `rules.anim_min_gap` to 0 (full-frame boxes skip the caption-band and UI-zone warnings). Keep the caption band free in the scene design, because captions are drawn on top.
 - **`rules`**: overrides the density limits in `render.py` (`RULES`). Change a limit only when the user asks for a denser or calmer style.
 
 ## Voice cloning (optional)
 
 `scripts/voice_clone.py` generates Spanish speech in the speaker's own voice with Chatterbox Multilingual (zero-shot, from about 10 s of their speech). It has two uses, and nothing else:
 - **Voice patch** (`edit.json` → `voice_patches`, source time): replaces the audio of a word range, for example a mispronounced name or a wrong figure. The clip is fitted to the original span: sped up by at most ×1.2, or padded with room tone if it is shorter. So no timestamp moves and the video frames stay. Then fix those words' text in `transcript.json` as usual, so the captions match.
-- **Voice-over** (`timeline.json` → `voiceover`, edited time): a short new line laid over the edit, typically over a full-screen animation or a scene where the face is covered. The speech underneath is ducked.
+- **Voice-over** (`timeline.json` → `voiceover`, edited time): a new line laid over the edit, typically over a full-screen animation or a scene where the face is covered. The speech underneath is ducked. With `extend`, a series of voice-overs can narrate full-screen scenes after the real footage, for example adapting an article the user provides. Keep each line under about 250 characters (one idea per scene); long lines degrade.
 
 Rules:
 1. **Consent first.** Clone only the voice of the person in the video, and only when the user confirms it is their own voice or that they have that person's permission. Ask explicitly before the first use. Record it as `"voice": {"consent": true}` in `edit.json`; the script refuses to run without it. Never clone a voice from any other recording.
@@ -251,6 +253,7 @@ Rules:
 4. **Listen before using.** After each run, play `work/voice/<id>.wav` (or have the user play it) and check the pronunciation, especially names and anglicisms. If the clip sounds wrong, rephrase, adjust `exaggeration` (0.3 for calm, 0.7 for energetic) or change `seed`, then re-run. Unchanged lines are not regenerated.
 5. **Reference.** By default the script picks the best 8–15 s of continuous, clean speech that is not cut or patched. If that stretch has music, noise or another voice, set `voice.ref` to `[start, end]` in source seconds.
 6. **No dubbing or translation.** This skill does not translate or re-voice whole videos.
+7. **Narrated scenes.** When the voice-over says new things (not a fix), show the script to the user at Checkpoint 1 and get it approved before generating. Adapt source material to the speaker's register and to social media: short sentences, second person, one idea per line, and a closing CTA. Never invent claims that are not in the source.
 
 `edit.json` example:
 ```json
@@ -295,7 +298,7 @@ Ids are shared by patches and voice-overs, so they must be unique across both fi
 Each animation is one Python file using `scripts/anim_kit.py`. It renders to a transparent `.mov` that is overlaid on the video. The API:
 - `Anim(w, h, duration, fps=30)`: sets the size of the animation box, not the full frame. Keep boxes small; typical sizes are 600–900 × 200–450 px for a 1080-wide video.
 - `@anim.draw def frame(c, t)`: `t` is in seconds.
-- Primitives: `c.rect`, `c.circle`, `c.line`, `c.arc`, `c.text`.
+- Primitives: `c.rect`, `c.circle`, `c.line`, `c.arc`, `c.polygon`, `c.text`.
 - `c.group(scale, alpha, origin, dx, dy, rotate)` animates several elements as one unit.
 - `c.progress(t, start, dur)` returns a local 0–1 progress value, to pass through `ease.*` (`out_back`, `out_cubic`, `in_cubic`, `in_out_cubic`, `out_quint`, `out_elastic`).
 - `c.fit(text, max_w, size)`: **always** use it for text that must fit a shape.

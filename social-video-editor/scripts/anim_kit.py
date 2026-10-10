@@ -149,6 +149,12 @@ class Canvas:
             d.ellipse([px - r, py - r, px + r, py + r], fill=rgba(color, alpha))
         self._put(L)
 
+    def polygon(self, points, fill, alpha=1.0):
+        """Filled polygon (hearts, stars, arrow heads, speech-bubble tails)."""
+        L = self._layer()
+        ImageDraw.Draw(L).polygon([(self._s(x), self._s(y)) for x, y in points], fill=rgba(fill, alpha))
+        self._put(L)
+
     def arc(self, cx, cy, r, start_deg, end_deg, color, width=10, alpha=1.0):
         L = self._layer()
         ImageDraw.Draw(L).arc([self._s(cx - r), self._s(cy - r), self._s(cx + r), self._s(cy + r)],

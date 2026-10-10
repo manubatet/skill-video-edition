@@ -66,7 +66,7 @@ Después, sube tu vídeo y pide algo como *"edita este vídeo para redes"*, o in
 - Opcional:
   - token de Hugging Face (detección de hablantes);
   - DeepFilterNet (mejor reducción de ruido);
-  - `chatterbox-tts` (clonación de voz; si choca con WhisperX, en un entorno virtual aparte);
+  - `chatterbox-tts` y `setuptools<80` (clonación de voz, Python 3.10–3.12; si choca con WhisperX, en un entorno virtual aparte);
   - Montserrat ExtraBold en `work/fonts/`.
 
 La GPU es opcional: en CPU funciona con int8, aunque más despacio.
