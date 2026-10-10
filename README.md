@@ -13,6 +13,7 @@
 - **Animaciones programadas**: el agente escribe cada animación en Python y se superpone con transparencia. Pueden ser tarjetas, contadores, sellos, barras de progreso o escenas 2D a pantalla completa.
 - **Guía de estilo**: 4 estilos de animación y 4 paletas de 5 colores con contraste verificado, o colores propios en HEX.
 - **Control de ritmo**: un validador bloquea las líneas de tiempo sobrecargadas.
+- **Clonación de voz** (opcional): corrige una palabra o frase mal dicha, o añade una voz en off corta, con la voz de quien habla (Chatterbox Multilingual, MIT). Solo con consentimiento explícito y sin doblaje.
 - **Extras**: propuesta de título, descripción, hashtags y miniaturas.
 
 ### Cómo trabaja
@@ -37,7 +38,7 @@ social-video-editor/          ← el skill (lo que se instala)
 ├── SKILL.md                  ← procedimiento para el agente
 ├── scripts/                  ← pipeline determinista (Python + FFmpeg)
 │   ├── transcribe.py  build_edit.py  captions.py  render.py
-│   └── anim_kit.py  sfx_synth.py  common.py
+│   └── anim_kit.py  sfx_synth.py  voice_clone.py  common.py
 ├── references/PRD.md         ← producto: objetivos, requisitos, roadmap
 └── agents/openai.yaml        ← metadatos opcionales para ChatGPT / Codex
 .claude/skills/social-video-editor  → enlace para Claude Code
@@ -57,7 +58,7 @@ Después, sube tu vídeo y pide algo como *"edita este vídeo para redes"*, o in
 
 ## Requisitos
 
-- Python 3.9 o superior y **FFmpeg compilado con libass** (`ffmpeg -filters | grep " ass "`).
+- Python 3.9 o superior y **FFmpeg compilado con libass** (vale cualquier versión, también la 8 y posteriores) (`ffmpeg -filters | grep " ass "`).
 - `pip install whisperx numpy pillow opencv-python-headless`
   - En el Python de sistema de Debian/Ubuntu, instala dentro de un entorno virtual (`python3 -m venv .venv`).
   - Sin GPU, añade `--extra-index-url https://download.pytorch.org/whl/cpu`.
@@ -65,6 +66,7 @@ Después, sube tu vídeo y pide algo como *"edita este vídeo para redes"*, o in
 - Opcional:
   - token de Hugging Face (detección de hablantes);
   - DeepFilterNet (mejor reducción de ruido);
+  - `chatterbox-tts` (clonación de voz; si choca con WhisperX, en un entorno virtual aparte);
   - Montserrat ExtraBold en `work/fonts/`.
 
 La GPU es opcional: en CPU funciona con int8, aunque más despacio.

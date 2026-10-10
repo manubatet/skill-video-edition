@@ -1,8 +1,10 @@
 """Shared helpers for the social-video-editor pipeline."""
 import json
+import re
 import subprocess
 import shutil
 import sys
+import wave
 from pathlib import Path
 
 
@@ -39,6 +41,20 @@ def run(cmd, quiet=True):
     return p
 
 
+_FFMPEG_MAJOR = None
+
+
+def filter_script(path):
+    """FFmpeg args that read a filter graph from a file. FFmpeg 7 added `-/filter_complex FILE`
+    and FFmpeg 8+ dropped the old `-filter_complex_script`."""
+    global _FFMPEG_MAJOR
+    if _FFMPEG_MAJOR is None:
+        out = run(["ffmpeg", "-hide_banner", "-version"]).stdout
+        m = re.search(r"ffmpeg version n?(\d+)\.", out)
+        _FFMPEG_MAJOR = int(m.group(1)) if m else 7  # git builds ("N-1234") are recent
+    return ["-/filter_complex", str(path)] if _FFMPEG_MAJOR >= 7 else ["-filter_complex_script", str(path)]
+
+
 def probe(path):
     """Return width, height, fps, duration and whether the file has audio."""
     need("ffprobe")
@@ -65,6 +81,11 @@ def probe(path):
         "duration": float(info["format"]["duration"]),
         "has_audio": a is not None,
     }
+
+
+def wav_duration(path):
+    with wave.open(str(path), "rb") as f:
+        return f.getnframes() / f.getframerate()
 
 
 def fmt(t):

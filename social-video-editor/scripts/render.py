@@ -6,7 +6,7 @@ Usage:
   python render.py --work work/                    # final render -> work/final.mp4
   python render.py --work work/ --preview --sheet  # also write work/qa_sheet.jpg (frames at every cue)
 
-Inputs: work/cut.mkv, work/transcript_edited.json, work/timeline.json, sfx/*.wav
+Inputs: work/cut.mkv, work/transcript_edited.json, work/timeline.json, sfx/*.wav, work/voice/*.wav
 """
 import argparse
 import sys
@@ -14,7 +14,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 from captions import CAPTION_DEFAULTS, anchor_xy, build_ass  # noqa: E402
-from common import die, load, need, probe, run, save  # noqa: E402
+from common import die, filter_script, load, need, probe, run, save, wav_duration  # noqa: E402
 
 RULES = {"sfx_min_gap": 3.0,          # s between two sound effects
          "zoom_min_len": 1.0,         # s, shorter punch-ins feel like glitches
@@ -35,7 +35,31 @@ def anim_box(a, meta, W, H):
     return int(cx - w / 2), int(cy - h / 2), w, h
 
 
-def validate(tl, tr, anims_meta, rules):
+def voiceovers(tl, work):
+    """Voice-over entries with their clip path and duration (clips come from voice_clone.py)."""
+    man_path = work / "voice" / "manifest.json"
+    manifest = load(man_path) if man_path.exists() else {}
+    out = []
+    for v in sorted(tl.get("voiceover", []), key=lambda v: v["at"]):
+        clip = work / "voice" / f"{v['id']}.wav"
+        if not clip.exists() or manifest.get(v["id"], {}).get("text") != v.get("text", "").strip():
+            die(f"voiceover {v['id']}: clip missing or out of date; run voice_clone.py first")
+        out.append({**v, "file": clip, "duration": wav_duration(clip)})
+    return out
+
+
+def duck_expr(vos, ramp=0.12):
+    """Volume factor for the speech track: eased down to duck_db under each voice-over."""
+    terms = []
+    for v in vos:
+        a, b = v["at"], v["at"] + v["duration"]
+        g = 10 ** (v.get("duck_db", -24) / 20)
+        env = f"clip((t-{a - ramp:.3f})/{ramp},0,1)*clip(({b + ramp:.3f}-t)/{ramp},0,1)"
+        terms.append(f"(1-{1 - g:.4f}*{env})")
+    return "*".join(terms)
+
+
+def validate(tl, tr, anims_meta, rules, vos=()):
     errs, warns = [], []
     D, W, H = tr["duration"], tr["width"], tr["height"]
     word_ids = {w["i"] for w in tr["words"]}
@@ -84,6 +108,18 @@ def validate(tl, tr, anims_meta, rules):
     for a, b in zip(anims, anims[1:]):
         if b["start"] < a["start"] + anims_meta[a["id"]]["duration"] + rules["anim_min_gap"]:
             errs.append(f"animations {a['id']} and {b['id']} are closer than {rules['anim_min_gap']}s")
+
+    for v in vos:
+        end = v["at"] + v["duration"]
+        if v["at"] < 0 or end > D + 0.05:
+            errs.append(f"voiceover {v['id']} ({v['at']}-{end:.2f}) outside the video; move it earlier")
+        spoken = [w for w in tr["words"] if w["start"] < end and w["end"] > v["at"]]
+        if spoken and v.get("duck_db", -24) > -40:
+            warns.append(f"voiceover {v['id']} plays over {len(spoken)} spoken words (ducked to "
+                         f"{v.get('duck_db', -24)} dB); make sure they are covered or not needed")
+    for a, b in zip(vos, vos[1:]):
+        if b["at"] < a["at"] + a["duration"]:
+            errs.append(f"voiceovers {a['id']} and {b['id']} overlap")
 
     emph = tl.get("emphasis_words", [])
     bad = [i for i in emph if i not in word_ids]
@@ -144,7 +180,7 @@ def zoom_expr(zooms, default_ramp=0.7):
     return "(1+" + "+".join(terms) + ")"
 
 
-def build_graph(tl, tr, anims_meta, sfx_dir, center, preview):
+def build_graph(tl, tr, anims_meta, sfx_dir, center, preview, vos=(), vo_gain=0.0):
     W, H = tr["width"], tr["height"]
     inputs, fc = [], []
     v = "0:v"
@@ -176,7 +212,17 @@ def build_graph(tl, tr, anims_meta, sfx_dir, center, preview):
         v = "vprev"
     fc.append(f"[{v}]format=yuv420p[vout]")
 
-    alabels = ["[0:a]"]
+    if vos:
+        fc.append(f"[0:a]volume='{duck_expr(vos)}':eval=frame[aduck]")
+        alabels = ["[aduck]"]
+    else:
+        alabels = ["[0:a]"]
+    for vo in vos:
+        inputs += ["-i", str(Path(vo["file"]).resolve())]
+        fc.append(f"[{idx}:a]aresample=48000,volume={vo_gain + vo.get('gain_db', 0):.2f}dB,"
+                  f"adelay={int(vo['at'] * 1000)}:all=1[vo{idx}]")
+        alabels.append(f"[vo{idx}]")
+        idx += 1
     for s in sorted(tl.get("sfx", []), key=lambda s: s["at"]):
         f = Path(sfx_dir) / f"{s['sound']}.wav"
         if not f.exists():
@@ -191,7 +237,7 @@ def build_graph(tl, tr, anims_meta, sfx_dir, center, preview):
         fc.append(f"{''.join(alabels)}amix=inputs={len(alabels)}:normalize=0:duration=first:dropout_transition=0,"
                   f"alimiter=limit=0.89:level=false[aout]")
     else:
-        fc.append("[0:a]anull[aout]")
+        fc.append(f"{alabels[0]}anull[aout]")
     return inputs, fc
 
 
@@ -240,7 +286,8 @@ def main():
         anims_meta[a["id"]] = probe(a["file"])
         a["duration"] = anims_meta[a["id"]]["duration"]  # captions.py needs it for hide_captions
 
-    errs, warns = validate(tl, tr, anims_meta, rules)
+    vos = voiceovers(tl, work)
+    errs, warns = validate(tl, tr, anims_meta, rules, vos)
     for w in warns:
         print(f"WARN: {w}")
     for e in errs:
@@ -259,14 +306,17 @@ def main():
         print(f"zoom centre = {tl['zoom_center']}")
     (work / "captions.ass").write_text(build_ass(tr, tl), encoding="utf-8")
 
-    inputs, fc = build_graph(tl, tr, anims_meta, Path(args.sfx).resolve(), center or (0.5, 0.4), args.preview)
+    seg_path = work / "segments.json"
+    vo_gain = load(seg_path).get("loudness_gain_db", 0.0) if vos and seg_path.exists() else 0.0
+    inputs, fc = build_graph(tl, tr, anims_meta, Path(args.sfx).resolve(), center or (0.5, 0.4), args.preview,
+                             vos, vo_gain)
     (work / "render_graph.txt").write_text(";\n".join(fc), encoding="utf-8")
     out = work / ("preview.mp4" if args.preview else "final.mp4")
     enc = (["-c:v", "libx264", "-preset", "ultrafast", "-crf", "28"] if args.preview
            else ["-c:v", "libx264", "-preset", "slow", "-crf", "18", "-profile:v", "high"])
     (work / "fonts").mkdir(exist_ok=True)
     cmd = (["ffmpeg", "-y", "-i", str(work / "cut.mkv")] + inputs +
-           ["-filter_complex_script", "render_graph.txt", "-map", "[vout]", "-map", "[aout]"] + enc +
+           filter_script("render_graph.txt") + ["-map", "[vout]", "-map", "[aout]"] + enc +
            ["-r", str(tr["fps"]), "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-movflags", "+faststart", str(out)])
     import subprocess
     p = subprocess.run(cmd, cwd=work, capture_output=True, text=True)
@@ -278,6 +328,7 @@ def main():
     if args.sheet:
         times = [((z["start"] + z["end"]) / 2, f"zoom x{z.get('scale', 1.15)}") for z in tl.get("zooms", [])]
         times += [(a["start"] + anims_meta[a["id"]]["duration"] * 0.5, f"anim {a['id']}") for a in tl.get("animations", [])]
+        times += [(v["at"] + v["duration"] / 2, f"voiceover {v['id']}") for v in vos]
         times += [(tr["duration"] * f, "captions") for f in (0.1, 0.5)]
         qa_sheet(out, sorted(times), work / "qa_sheet.jpg")
 
