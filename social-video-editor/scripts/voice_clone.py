@@ -10,6 +10,7 @@ Settings (edit.json "voice", all optional except consent):
   {
     "consent": true,          # REQUIRED: the user confirmed the voice is theirs or they have permission
     "ref": [31.2, 43.0],      # source seconds of clean speech to clone from; null = pick automatically
+    "ref_file": null,         # or a saved reference wav (e.g. _shared/voices/<speaker>/ref.wav)
     "exaggeration": 0.5,      # 0.25-1.0, higher = more expressive
     "cfg_weight": 0.5,        # 0.3-0.7, lower = slower, more deliberate delivery
     "seed": 7
@@ -28,9 +29,9 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).parent))
-from common import die, load, need, run, save  # noqa: E402
+from common import die, load, need, run, save, wav_duration  # noqa: E402
 
-VOICE_DEFAULTS = {"consent": False, "ref": None, "exaggeration": 0.5, "cfg_weight": 0.5, "seed": 7}
+VOICE_DEFAULTS = {"consent": False, "ref": None, "ref_file": None, "exaggeration": 0.5, "cfg_weight": 0.5, "seed": 7}
 REF_MIN, REF_IDEAL, REF_MAX = 5.0, 8.0, 15.0  # seconds of reference speech
 SR = 24000
 
@@ -98,6 +99,13 @@ def pick_ref(t, excluded):
 
 
 def build_ref(t, cfg, edit, work):
+    ref = work / "voice" / "ref.wav"
+    ref.parent.mkdir(parents=True, exist_ok=True)
+    if cfg["ref_file"]:
+        if not Path(cfg["ref_file"]).exists():
+            die(f"voice.ref_file not found: {cfg['ref_file']}")
+        run(["ffmpeg", "-y", "-i", str(cfg["ref_file"]), "-vn", "-ac", "1", "-ar", str(SR), str(ref)])
+        return ref, str(cfg["ref_file"])
     excluded = set()
     for p in edit.get("voice_patches", []):
         excluded.update(range(p["words"][0], p["words"][1] + 1))
@@ -115,8 +123,6 @@ def build_ref(t, cfg, edit, work):
     if not span:
         die(f"no {REF_MIN:.0f}+ s stretch of clean continuous speech found; set voice.ref = [start, end] by hand")
     a, b = max(0.0, span[0] - 0.1), min(t["duration"], span[1] + 0.1)
-    ref = work / "voice" / "ref.wav"
-    ref.parent.mkdir(parents=True, exist_ok=True)
     run(["ffmpeg", "-y", "-ss", f"{a:.3f}", "-to", f"{b:.3f}", "-i", t["source"], "-vn", "-ac", "1",
          "-ar", str(SR), "-af", "highpass=f=70,afftdn=nf=-25", str(ref)])
     return ref, [round(a, 3), round(b, 3)]
@@ -196,7 +202,8 @@ def main():
     settings = {k: cfg[k] for k in ("exaggeration", "cfg_weight", "seed")}
     man_path = work / "voice" / "manifest.json"
     manifest = load(man_path) if man_path.exists() else {}
-    print(f"reference: source {ref_span[0]:.2f}-{ref_span[1]:.2f}s ({ref_span[1] - ref_span[0]:.1f}s) -> {ref}")
+    where = ref_span if isinstance(ref_span, str) else f"source {ref_span[0]:.2f}-{ref_span[1]:.2f}s"
+    print(f"reference: {where} ({wav_duration(ref):.1f}s) -> {ref}")
 
     model, done = None, 0
     for kind, ln in lines:

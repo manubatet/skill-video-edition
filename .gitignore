@@ -6,3 +6,8 @@ __pycache__/
 *.mp4
 *.mov
 *.mkv
+
+# Projects folder (videos, renders, model weights, environments) and the local skill config
+Projects/
+.social-video-editor.json
+.DS_Store

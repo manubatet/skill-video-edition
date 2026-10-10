@@ -83,7 +83,22 @@ Then pick the profile that matches:
 
 The pipeline needs Python 3.9+, FFmpeg built with libass, and a machine that can download the Whisper models from Hugging Face. A GPU is optional: CPU with int8 works but is slower. On Apple Silicon, WhisperX runs on CPU.
 
-1. **Project management: one folder per project.** Create a project folder named `<video-name>_edit/` **inside the current working directory** (where the agent is running), not next to the source video if that file lives elsewhere (Downloads, a temp upload path, etc.) — copy or symlink the video into the project folder instead. This folder holds everything for that project: the video, `scripts/`, `work/` (transcript, edit decisions, timeline, renders) and any extras. Every command below runs from inside that folder. If a folder with that name already exists for a different video, ask the user for a project name rather than overwriting it. Never mix two projects' `work/` in the same folder.
+1. **Projects folder (ask once, then reuse).** Read `.social-video-editor.json` in the current working directory. If it has `projects_dir`, use it without asking. Otherwise ask the user where to keep their video projects. Recommend `Projects/` inside the current working directory, and accept any path they give. Explain that this folder will hold the finished videos and everything worth reusing: model weights, Python environments, voices, fonts, SFX and animations. Save the answer as `{"projects_dir": "<path>"}` in `.social-video-editor.json`. If the working directory is a git repository, add the projects folder to `.gitignore`, because media and weights never go to git. Layout:
+   ```
+   <projects_dir>/
+   ├── _shared/                  reused by every project
+   │   ├── models/               HF_HOME: Whisper, alignment and TTS weights, downloaded once
+   │   ├── envs/                 .venv (WhisperX) and .venv-voice (TTS)
+   │   ├── voices/<speaker>/     ref.wav + ref.txt + consent.txt, to clone the same speaker again
+   │   ├── fonts/  sfx/          caption fonts and the SFX library
+   │   └── anims/                animations worth reusing (copy the .py and re-run it with the new style)
+   └── <video-name>/             one folder per video
+       ├── <source video>        a copy or a symlink, never moved from where the user keeps it
+       ├── scripts/              this skill's scripts
+       ├── work/                 transcript, edit.json, timeline.json, anims/, voice/, previews
+       └── final/                final.mp4 + extras.md (title, description, hashtags, thumbnails)
+   ```
+   Before running any script, `export HF_HOME=<projects_dir>/_shared/models`, so model downloads land in `_shared/` and are reused. Run Python from `_shared/envs/`. Link `work/fonts` to `_shared/fonts`, and pass `--sfx <projects_dir>/_shared/sfx` to `render.py`. Every command below runs from inside the project folder. If a folder with that name already exists for a different video, ask for a project name rather than overwriting it. Never mix two projects' `work/` in the same folder.
 2. Copy this skill's `scripts/` folder (next to this `SKILL.md`) into `<project>/scripts/`. Do not rewrite the scripts.
 3. Install and check the dependencies:
    ```bash
@@ -200,7 +215,7 @@ Send `work/preview.mp4` and a three-line summary of what was added. Apply feedba
 ```bash
 python scripts/render.py --work work
 ```
-Deliver `work/final.mp4`. Also give the extras in the reply, derived from the transcript:
+Copy `work/final.mp4` to `final/` and deliver it from there. Also give the extras in the reply, and save them to `final/extras.md`. Derive them from the transcript:
 - a title (up to 60 characters);
 - a description (2–3 lines, Spanish);
 - 5–8 hashtags;
@@ -261,6 +276,8 @@ Rules:
  "voice_patches": [{"id": "p1", "words": [120, 122], "text": "el veinticinco por ciento"}]}
 ```
 Ids are shared by patches and voice-overs, so they must be unique across both files. The clips go to `work/voice/`.
+
+**Reusing a voice.** After a speaker's first project, save the reference to `_shared/voices/<speaker>/`: `ref.wav` (copy `work/voice/ref.wav`), `ref.txt` (its transcript) and `consent.txt` (who gave permission, and when). In later projects, set `"voice": {"consent": true, "ref_file": "<projects_dir>/_shared/voices/<speaker>/ref.wav"}`, so the same voice is used without picking a reference again. Ask about consent again if the use is different from the one recorded.
 
 ## Editorial rules
 

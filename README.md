@@ -38,7 +38,7 @@ social-video-editor/          ← el skill (lo que se instala)
 ├── SKILL.md                  ← procedimiento para el agente
 ├── scripts/                  ← pipeline determinista (Python + FFmpeg)
 │   ├── transcribe.py  build_edit.py  captions.py  render.py
-│   └── anim_kit.py  sfx_synth.py  voice_clone.py  common.py
+│   └── anim_kit.py  sfx_synth.py  voice_clone.py  align_voice.py  common.py
 ├── references/PRD.md         ← producto: objetivos, requisitos, roadmap
 └── agents/openai.yaml        ← metadatos opcionales para ChatGPT / Codex
 .claude/skills/social-video-editor  → enlace para Claude Code
@@ -55,6 +55,18 @@ social-video-editor/          ← el skill (lo que se instala)
 | **ChatGPT** | Sube el mismo `.zip` desde el selector de Skills. `agents/openai.yaml` aporta el nombre, la descripción y el prompt por defecto. |
 
 Después, sube tu vídeo y pide algo como *"edita este vídeo para redes"*, o invoca el skill por su nombre (`/social-video-editor` en Claude Code).
+
+## Carpeta de proyectos
+
+La primera vez, el skill te pregunta dónde guardar los proyectos (por defecto, `Projects/`) y lo recuerda en `.social-video-editor.json`. Ahí se queda todo lo reutilizable, para no descargar ni rehacer nada en el siguiente vídeo:
+
+```
+Projects/
+├── _shared/          modelos (HF_HOME), entornos de Python, voces clonadas, fuentes, SFX y animaciones reutilizables
+└── <vídeo>/          scripts/, work/ (transcripción, JSON de decisiones, animaciones, voz) y final/ (vídeo final + textos)
+```
+
+La carpeta está en `.gitignore`: los vídeos y los pesos de los modelos nunca se suben a GitHub.
 
 ## Requisitos
 
