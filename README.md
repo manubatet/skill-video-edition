@@ -6,7 +6,7 @@
 
 - **Transcribe** con marcas de tiempo por palabra (WhisperX large-v3 y alineación en español). Admite un glosario de nombres y marcas.
 - **Corta** repeticiones de toma, tartamudeos y silencios largos. **Nunca** quita las muletillas, porque forman parte de la voz de quien habla.
-- **Limpia el audio**: reducción de ruido suave y normalización a -14 LUFS en dos pasadas.
+- **Limpia el audio**: reducción de ruido solo si hace falta (el audio limpio no se toca) y normalización a -14 LUFS en dos pasadas.
 - **Subtítulos** incrustados en tres modos (karaoke, palabra a palabra o frases) y tres posiciones, respetando las zonas seguras de TikTok y Reels. Las palabras clave se resaltan.
 - **Zooms graduales**: acercamientos suaves centrados en la cara que tardan 0,7 s en entrar y en salir, en lugar de cortes.
 - **Efectos de sonido** sintetizados, libres de derechos y colocados con moderación.

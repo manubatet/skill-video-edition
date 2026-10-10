@@ -9,7 +9,8 @@ Reads  work/transcript.json and work/edit.json (all fields optional):
     "remove_words": [[120, 131]],      # inclusive ranges of word ids (false starts)
     "max_gap": 0.40,                   # pauses longer than this are cut (s)
     "pad": 0.12,                       # breathing room kept around speech (s)
-    "denoise": "light",                # off | light (FFmpeg afftdn) | deepfilter (DeepFilterNet CLI)
+    "denoise": "auto",                 # auto | off | light (FFmpeg afftdn) | deepfilter (DeepFilterNet CLI)
+                                       # auto = light only if the pauses are noisy (clean audio stays untouched)
     "loudness": -14,                   # integrated LUFS target
     "voice_patches": [{"id": "p1", "words": [40, 42], "text": "..."}]  # see voice_clone.py
   }
@@ -32,7 +33,8 @@ sys.path.insert(0, str(Path(__file__).parent))
 from common import die, filter_script, load, need, run, save, wav_duration, write_readable  # noqa: E402
 
 DEFAULTS = {"remove_sentences": [], "remove_words": [], "max_gap": 0.40, "pad": 0.12,
-            "denoise": "light", "loudness": -14, "voice_patches": []}
+            "denoise": "auto", "loudness": -14, "voice_patches": []}
+NOISY_DB = -50  # pause level above which "auto" denoises
 PATCH_MAX_STRETCH = 1.20  # a generated clip may be sped up by this much to fit its span
 SR = 48000
 
@@ -119,8 +121,30 @@ def retime(t, segs):
     return {**t, "duration": round(duration, 3), "edited": True, "sentences": sentences, "words": new_words}
 
 
-def denoise_source(src, mode, work):
+def pause_level_db(src, t, work):
+    """Median level (dBFS) of 50 ms frames in the gaps between words: the background noise.
+    The median ignores breaths, which would dominate an average."""
+    from voice_clone import read_wav
+    wav = work / "pauses_probe.wav"
+    run(["ffmpeg", "-y", "-i", str(src), "-vn", "-ac", "1", "-ar", "16000", str(wav)])
+    x, sr = read_wav(wav)
+    wav.unlink()
+    ws = t["words"]
+    n, levels = int(0.05 * sr), []
+    for a, b in zip(ws, ws[1:]):
+        if b["start"] - a["end"] > 0.3:
+            g = x[int((a["end"] + 0.08) * sr):int((b["start"] - 0.08) * sr)]
+            fr = g[: len(g) // n * n].reshape(-1, n)
+            levels += list(20 * np.log10(np.sqrt((fr ** 2).mean(axis=1)) + 1e-9))
+    return float(np.median(levels)) if levels else None
+
+
+def denoise_source(src, mode, work, t=None):
     """Return (path, extra_filter) for the audio to cut from."""
+    if mode == "auto":
+        level = pause_level_db(src, t, work) if t else None
+        mode = "light" if level is not None and level > NOISY_DB else "off"
+        print(f"denoise auto: pauses at {'n/a' if level is None else f'{level:.0f} dBFS'} -> {mode}")
     if mode == "off":
         return src, ""
     if mode == "deepfilter":
@@ -217,7 +241,7 @@ def main():
     save(edited, work / "transcript_edited.json")
     write_readable(edited, work / "transcript_edited.txt")
 
-    audio_src, afilter = denoise_source(Path(t["source"]), cfg["denoise"], work)
+    audio_src, afilter = denoise_source(Path(t["source"]), cfg["denoise"], work, t)
     if cfg["voice_patches"]:
         audio_src = patch_audio(audio_src, t, cfg, removed, work)
     fc, labels = [], []

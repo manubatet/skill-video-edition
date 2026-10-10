@@ -12,6 +12,7 @@ Engines (edit.json "voice.engine"):
 Reads the lines to generate from the two decision files (the text lives there, nowhere else):
   work/edit.json      "voice": {...settings...}, "voice_patches": [{"id": "p1", "words": [120, 123], "text": "..."}]
   work/timeline.json  "voiceover": [{"id": "v1", "at": 12.3, "text": "..."}]
+A line may carry its own "seed" to re-roll just that take (e.g. a mispronounced word).
 Settings (edit.json "voice", all optional except consent):
   {
     "consent": true,          # REQUIRED: the user confirmed the voice is theirs or they have permission
@@ -19,6 +20,8 @@ Settings (edit.json "voice", all optional except consent):
     "ref_file": null,         # or a saved reference wav (e.g. _shared/voices/<speaker>/ref.wav);
                               # its transcript goes in ref.txt next to it (voxcpm needs it)
     "engine": "voxcpm",       # voxcpm | chatterbox | elevenlabs
+    "steps": 25,              # voxcpm: diffusion steps (10 = fast draft, 25-30 = clean final audio)
+    "cfg_value": 2.0,         # voxcpm: guidance; lower sounds looser, higher more literal
     "exaggeration": 0.5,      # chatterbox: 0.25-1.0, higher = more expressive
     "cfg_weight": 0.5,        # chatterbox: 0.3-0.7, lower = slower, more deliberate delivery
     "api_key_env": "ELEVENLABS_API_KEY",   # elevenlabs: env var holding the key (never the key itself)
@@ -45,10 +48,11 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).parent))
 from common import die, load, need, run, save, wav_duration  # noqa: E402
 
-VOICE_DEFAULTS = {"consent": False, "ref": None, "ref_file": None, "engine": "voxcpm", "exaggeration": 0.5,
+VOICE_DEFAULTS = {"consent": False, "ref": None, "ref_file": None, "engine": "voxcpm", "steps": 25,
+                  "cfg_value": 2.0, "exaggeration": 0.5,
                   "cfg_weight": 0.5, "api_key_env": "ELEVENLABS_API_KEY",
                   "elevenlabs_model": "eleven_multilingual_v2", "seed": 7}
-ENGINE_SETTINGS = {"voxcpm": ("seed",), "chatterbox": ("exaggeration", "cfg_weight", "seed"),
+ENGINE_SETTINGS = {"voxcpm": ("steps", "cfg_value", "seed"), "chatterbox": ("exaggeration", "cfg_weight", "seed"),
                    "elevenlabs": ("elevenlabs_model", "seed")}
 REF_MIN, REF_IDEAL, REF_MAX = 5.0, 8.0, 15.0  # seconds of reference speech
 ELEVENLABS_API = "https://api.elevenlabs.io/v1"
@@ -144,7 +148,7 @@ def build_ref(t, cfg, edit, work):
         die(f"no {REF_MIN:.0f}+ s stretch of clean continuous speech found; set voice.ref = [start, end] by hand")
     a, b = max(0.0, span[0] - 0.1), min(t["duration"], span[1] + 0.1)
     run(["ffmpeg", "-y", "-ss", f"{a:.3f}", "-to", f"{b:.3f}", "-i", t["source"], "-vn", "-ac", "1",
-         "-ar", str(SR), "-af", "highpass=f=70,afftdn=nf=-25", str(ref)])
+         "-ar", str(SR), "-af", "highpass=f=60", str(ref)])  # no denoiser: its artifacts get cloned
     text = " ".join(w["text"] for w in t["words"]
                     if w.get("start") is not None and w["start"] >= a - 0.05 and w["end"] <= b + 0.05)
     return ref, [round(a, 3), round(b, 3)], text
@@ -196,7 +200,8 @@ def load_voxcpm(device, ref, ref_text, cfg, work):
         import torch
         torch.manual_seed(cfg["seed"])
         wav = model.generate(text=text, prompt_wav_path=str(ref), prompt_text=ref_text,
-                             reference_wav_path=str(ref))
+                             reference_wav_path=str(ref), inference_timesteps=int(cfg["steps"]),
+                             cfg_value=float(cfg["cfg_value"]))
         return np.asarray(wav, dtype=np.float32).squeeze(), model.tts_model.sample_rate
     return synth, "VoxCPM2"
 
@@ -219,14 +224,17 @@ def load_elevenlabs(device, ref, ref_text, cfg, work):
     api = ELEVENLABS_API
     # cache the cloned voice next to a saved reference (reused across projects), else in work/voice
     cache = Path(cfg["ref_file"]).with_name("elevenlabs.json") if cfg["ref_file"] else work / "voice" / "elevenlabs.json"
-    ref_hash = hashlib.sha1(Path(ref).read_bytes()).hexdigest()[:12]
+    # ElevenLabs clones best from 1-2 min of speech: prefer a longer sample saved next to the reference
+    long_sample = Path(cfg["ref_file"]).with_name("elevenlabs_sample.wav") if cfg["ref_file"] else None
+    sample = long_sample if long_sample and long_sample.exists() else Path(ref)
+    ref_hash = hashlib.sha1(sample.read_bytes()).hexdigest()[:12]
     cached = load(cache) if cache.exists() else {}
     voice_id = cfg.get("elevenlabs_voice_id") or (cached.get("voice_id") if cached.get("ref_hash") == ref_hash else None)
     if not voice_id:
         b = uuid.uuid4().hex
         parts = [f'--{b}\r\nContent-Disposition: form-data; name="name"\r\n\r\n{work.resolve().parent.name}\r\n'.encode(),
                  f'--{b}\r\nContent-Disposition: form-data; name="files"; filename="ref.wav"\r\n'
-                 f"Content-Type: audio/wav\r\n\r\n".encode() + Path(ref).read_bytes() + b"\r\n",
+                 f"Content-Type: audio/wav\r\n\r\n".encode() + sample.read_bytes() + b"\r\n",
                  f"--{b}--\r\n".encode()]
         out = json.loads(_el_request(f"{api}/voices/add", key, b"".join(parts), f"multipart/form-data; boundary={b}"))
         voice_id = out["voice_id"]
@@ -297,9 +305,10 @@ def main():
     where = ref_span if isinstance(ref_span, str) else f"source {ref_span[0]:.2f}-{ref_span[1]:.2f}s"
     print(f"reference: {where} ({wav_duration(ref):.1f}s) -> {ref}")
 
-    synth, done = None, 0
+    synth, done, base_seed = None, 0, cfg["seed"]
     for kind, ln in lines:
-        key = json.dumps([ln["text"].strip(), settings, ref_span], ensure_ascii=False)
+        line_settings = {**settings, "seed": ln.get("seed", base_seed)}
+        key = json.dumps([ln["text"].strip(), line_settings, ref_span], ensure_ascii=False)
         h = hashlib.sha1(key.encode()).hexdigest()[:12]
         out = work / "voice" / f"{ln['id']}.wav"
         if not args.force and out.exists() and manifest.get(ln["id"], {}).get("hash") == h:
@@ -309,6 +318,7 @@ def main():
             device = pick_device(args.device) if cfg["engine"] != "elevenlabs" else None
             synth, label = ENGINES[cfg["engine"]](device, ref, ref_text, cfg, work)
             print(f"model: {label}")
+        cfg["seed"] = line_settings["seed"]
         x, sr = synth(ln["text"].strip())
         x = trim_edges(resample(x, sr, SR), SR)
         x = x * min(target_rms / active_rms(x, SR), 10 ** (24 / 20))

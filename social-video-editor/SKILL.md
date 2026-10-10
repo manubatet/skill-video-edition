@@ -214,7 +214,7 @@ Add `voice` and `voice_patches` to `work/edit.json` and run `python scripts/voic
 ```bash
 python scripts/build_edit.py --work work
 ```
-This writes `work/cut.mkv` (cuts, light denoise, two-pass loudness normalization to -14 LUFS), `work/segments.json` and `work/transcript_edited.json/.txt`. Report the before and after duration.
+This writes `work/cut.mkv` (cuts, denoise only if the pauses are noisy, two-pass loudness normalization to -14 LUFS), `work/segments.json` and `work/transcript_edited.json/.txt`. Report the before and after duration.
 
 ### 4. Classify and plan effects
 Read `transcript_edited.json`. Then write `work/timeline.json` (schema below), following *Editorial rules* and the table approved at Checkpoint 1. Include the `classification` array: it documents the reasoning and makes later changes easy to discuss. If an approved row cannot be placed as agreed (for example two animations now violate `anim_min_gap`), show the updated table and say what changed. If the plan has `voiceover` entries, run `voice_clone.py` again now: it only generates the new lines. Then run `python scripts/align_voice.py --work work` in the WhisperX environment, so the voice-overs get captions.
@@ -284,7 +284,7 @@ Field notes:
 |---|---|---|
 | `voxcpm` (default) | local, VoxCPM2, Apache-2.0, 48 kHz | Best Spain-Spanish accent and naturalness in our blind test. Needs the reference transcript (`ref.txt` next to `ref_file`, or taken from the transcript for a `ref` span). `pip install voxcpm soundfile`. |
 | `chatterbox` | local, MIT | Lighter, but tends towards a Latin American accent. |
-| `elevenlabs` | ElevenLabs API, paid | Highest quality. The user needs an account whose plan includes voice cloning, and the key in the environment variable named by `api_key_env`. The voice is cloned once and its id cached in `elevenlabs.json` next to the reference. Uploading a voice to a third party needs the speaker's consent for that service too, so ask. |
+| `elevenlabs` | ElevenLabs API, paid | Highest quality. The user needs an account whose plan includes voice cloning, and the key in the environment variable named by `api_key_env`. The voice is cloned once and its id cached in `elevenlabs.json` next to the reference. ElevenLabs clones best from 1–2 minutes of speech, so save a longer, unprocessed sample as `elevenlabs_sample.wav` next to `ref.wav` (trim the ends, `highpass=f=60`, `loudnorm=I=-20:TP=-3`, no denoiser); it is uploaded instead of the short reference. Uploading a voice to a third party needs the speaker's consent for that service too, so ask. |
 
 Run `voice_clone.py` with the Python environment of the chosen engine (`_shared/envs/<engine>`). It has two uses, and nothing else:
 - **Voice patch** (`edit.json` → `voice_patches`, source time): replaces the audio of a word range, for example a mispronounced name or a wrong figure. The clip is fitted to the original span: sped up by at most ×1.2, or padded with room tone if it is shorter. So no timestamp moves and the video frames stay. Then fix those words' text in `transcript.json` as usual, so the captions match.
@@ -294,8 +294,8 @@ Rules:
 1. **Consent first.** Clone only the voice of the person in the video, and only when the user confirms it is their own voice or that they have that person's permission. Ask explicitly before the first use. Record it as `"voice": {"consent": true}` in `edit.json` and in `speakers.<id>.consent` of the user config; the script refuses to run without it. Never clone a voice from any other recording.
 2. **Lip sync.** A patch changes the sound but not the mouth. Use it for one to four words, ideally where the change is hard to see (similar mouth shapes, a zoom, an animation or B-roll covering the face). For longer changes, prefer cutting or a re-recording, and say so.
 3. **Keep the text short and natural.** Write it the way the speaker talks, with the same register. Write numbers as words ("veinticinco por ciento"). A patch must be about as long as the words it replaces. If the script says the clip is too long, shorten the text or widen the word range.
-4. **Listen before using.** After each run, play `work/voice/<id>.wav` (or have the user play it) and check the pronunciation, especially names and anglicisms. If the clip sounds wrong, rephrase, adjust `exaggeration` (0.3 for calm, 0.7 for energetic) or change `seed`, then re-run. Unchanged lines are not regenerated.
-5. **Reference.** By default the script picks the best 8–15 s of continuous, clean speech that is not cut or patched. If that stretch has music, noise or another voice, set `voice.ref` to `[start, end]` in source seconds.
+4. **Listen before using.** After each run, play `work/voice/<id>.wav` (or have the user play it) and check the pronunciation, especially names and anglicisms. Transcribe the clips back with Whisper and compare them with the text: a changed word ("hacer" for "nacer") is a mispronunciation. If a clip sounds wrong, give that line its own `"seed"` (re-rolls only that take), rephrase it, or adjust `exaggeration` (chatterbox: 0.3 for calm, 0.7 for energetic), then re-run. Unchanged lines are not regenerated.
+5. **Reference.** Never run a denoiser on a reference: the model clones its artifacts as a metallic, robotic timbre. By default the script picks the best 8–15 s of continuous, clean speech that is not cut or patched. If that stretch has music, noise or another voice, set `voice.ref` to `[start, end]` in source seconds.
 6. **No dubbing or translation.** This skill does not translate or re-voice whole videos.
 7. **Narrated scenes.** When the voice-over says new things (not a fix), show the script to the user at Checkpoint 1 and get it approved before generating. Adapt source material to the speaker's register and to social media: short sentences, second person, one idea per line, and a closing CTA. Never invent claims that are not in the source.
 
@@ -440,8 +440,9 @@ All four keep at least 3:1 WCAG contrast for every role on `fondo`, and at least
 | Wrong names in captions | `--glossary`, or fix the word texts at Checkpoint 1 |
 | Captions use the wrong font | the font file is missing from `work/fonts/`, or `style.font` doesn't match its family name (`fc-scan file.ttf`) |
 | Zoom crops the face | set `zoom_center` manually to `[x, y]` (normalized face position) |
-| Audio pumps or sounds robotic | `"denoise": "off"` |
+| Audio pumps or sounds robotic | `"denoise": "off"` (the default `auto` only denoises when the pauses are noisy, above -50 dBFS) |
 | Cloned voice doesn't sound like the speaker | set `voice.ref` to a cleaner 10–15 s stretch; lower `exaggeration` |
+| Cloned voice sounds robotic or metallic | the reference was denoised (rebuild it with only `highpass=f=60`); with `voxcpm`, raise `voice.steps` to 25–30 |
 | Cloned voice is rushed or flat | lower `cfg_weight` (0.3) for a slower delivery; raise `exaggeration` for energy |
 | `filter_complex_script` not recognized | FFmpeg 8+ removed it; the scripts detect the version, so recopy `scripts/` from the skill |
 
