@@ -53,13 +53,34 @@ Before Setup, do one simple, non-blocking check:
 
 ```bash
 LOCAL=$(cat VERSION 2>/dev/null || echo unknown)
-REMOTE=$(curl -s --max-time 3 https://api.github.com/repos/manubatet/skill-video-edition/commits/main | grep -m1 '"sha"' | cut -d'"' -f4 | cut -c1-7)
+REPO=manubatet/skill-video-edition   # or update_repo from the user config
+REMOTE=$(curl -s --max-time 3 https://api.github.com/repos/$REPO/commits/main | grep -m1 '"sha"' | cut -d'"' -f4 | cut -c1-7)
 echo "local=$LOCAL remote=${REMOTE:-unreachable}"
 ```
 
 - No network, or `curl` fails: skip silently and continue. This never blocks the run.
 - `REMOTE` differs from `LOCAL`: say so in one line, for example "Tu skill social-video-editor no está actualizada (local `81108d2`, remoto `a1b2c3d`). Actualízala desde https://github.com/manubatet/skill-video-edition (`git pull` si trabajas dentro del repo, o vuelve a copiar/descargar la carpeta `social-video-editor/` si la usas suelta)." Then continue normally; do not wait for the user to update.
 - If this skill folder is itself a checkout of that repo (`.git` present and `git remote -v` shows `skill-video-edition`), prefer `git fetch origin -q && git rev-list --count HEAD..origin/main` — a non-zero count means updates are available, and `git pull --ff-only` applies them.
+
+## User config (`.social-video-editor.json`)
+
+Read this file from the current working directory at the start of every run, before the update check. It holds the user's standing answers, so the intake only asks what is new for this video. The template is `config.example.json` next to this `SKILL.md`.
+
+| Key | Holds | Replaces |
+|---|---|---|
+| `projects_dir` | where projects and `_shared/` live | Setup step 1 question |
+| `ask` | `"missing"` (default): ask only what the config doesn't answer. `"always"`: ask everything, with the config's answers as the recommended options | — |
+| `update_repo` | `owner/repo` for the update check | the repository hard-coded below |
+| `defaults.captions`, `.effects`, `.anim_style`, `.palette`, `.font`, `.loudness` | the house style: `palette` is a preset key or `{"fondo", "texto", "principal", "secundario", "alerta"}` in HEX | intake questions 1–3, 5 and 6 |
+| `glossary` | names and brands for `--glossary` (merged with any new ones) | the glossary invite |
+| `speakers.<id>` | `name` and `title` for lower thirds, `voice_ref` (saved reference wav), `consent` (who allowed what, and when) | re-asking the name and title, picking a voice reference, and the consent question when the use matches |
+| `voice` | `engine` (`voxcpm` \| `chatterbox` \| `elevenlabs`), `api_key_env`, `elevenlabs_model` | the engine choice |
+
+Rules:
+- **Say what you are reusing.** When the config answers intake questions, skip them, and say so in one line so the user can override, for example: "Uso tu configuración: karaoke al 64 %, flat 2D, paleta Calma, voz VoxCPM2. Dime si cambias algo."
+- **Offer to save.** At the end of a run, if the user answered questions the config doesn't cover (a new speaker, a custom palette, a projects folder), offer to save those answers. Write the file only after they agree.
+- **Never store secrets.** Credentials (ElevenLabs keys, tokens) never go in this file or in any project file. The config holds only the *name* of the environment variable (`api_key_env`). The key lives in the user's shell profile, the system keychain or a git-ignored `.env`. If the variable is missing, tell the user how to set it; never ask them to paste the key in chat.
+- The file is personal: keep it out of git (add it to `.gitignore`).
 
 ## Runtime profiles
 
@@ -83,7 +104,7 @@ Then pick the profile that matches:
 
 The pipeline needs Python 3.9+, FFmpeg built with libass, and a machine that can download the Whisper models from Hugging Face. A GPU is optional: CPU with int8 works but is slower. On Apple Silicon, WhisperX runs on CPU.
 
-1. **Projects folder (ask once, then reuse).** Read `.social-video-editor.json` in the current working directory. If it has `projects_dir`, use it without asking. Otherwise ask the user where to keep their video projects. Recommend `Projects/` inside the current working directory, and accept any path they give. Explain that this folder will hold the finished videos and everything worth reusing: model weights, Python environments, voices, fonts, SFX and animations. Save the answer as `{"projects_dir": "<path>"}` in `.social-video-editor.json`. If the working directory is a git repository, add the projects folder to `.gitignore`, because media and weights never go to git. Layout:
+1. **Projects folder (ask once, then reuse).** If the user config has `projects_dir`, use it without asking. Otherwise ask the user where to keep their video projects. Recommend `Projects/` inside the current working directory, and accept any path they give. Explain that this folder will hold the finished videos and everything worth reusing: model weights, Python environments, voices, fonts, SFX and animations. Save the answer as `{"projects_dir": "<path>"}` in `.social-video-editor.json`. If the working directory is a git repository, add the projects folder to `.gitignore`, because media and weights never go to git. Layout:
    ```
    <projects_dir>/
    ├── _shared/                  reused by every project
@@ -112,13 +133,13 @@ The pipeline needs Python 3.9+, FFmpeg built with libass, and a machine that can
    - **Better denoising.** `pip install deepfilternet`, then set `"denoise": "deepfilter"`.
    - **Caption font.** Put a bold TTF (default: Montserrat ExtraBold, OFL license) in `work/fonts/`. Set `style.font` to the font's family name. Without it, captions fall back to a system font.
    - **Better SFX.** Any `.wav` placed in `sfx/` with the same name (for example a CC0 `whoosh.wav` from Freesound) replaces the synthesized one.
-   - **Voice cloning.** `pip install chatterbox-tts "setuptools<80"` (Chatterbox Multilingual, MIT; its watermarker still imports `pkg_resources`, which newer setuptools removed). Use Python 3.10–3.12. It pins its own `torch`; if that clashes with WhisperX, install it in a separate venv (`python3 -m venv .venv-voice`) and run only `voice_clone.py` from there. The first run downloads the model from Hugging Face. It runs on CUDA, Apple MPS or CPU (CPU takes a few seconds per line). Install it only when the user wants a voice fix.
+   - **Voice cloning.** VoxCPM2 (default): `pip install voxcpm soundfile` in its own venv. Chatterbox: `pip install chatterbox-tts "setuptools<80"` (Chatterbox Multilingual, MIT; its watermarker still imports `pkg_resources`, which newer setuptools removed). Use Python 3.10–3.12. It pins its own `torch`; if that clashes with WhisperX, install it in a separate venv (`python3 -m venv .venv-voice`) and run only `voice_clone.py` from there. The first run downloads the model from Hugging Face. It runs on CUDA, Apple MPS or CPU (CPU takes a few seconds per line). Install it only when the user wants a voice fix.
 
 If a model download is blocked (sandboxed or offline machine), switch to runtime profile 2.
 
 ## Intake: two quick rounds
 
-Ask using the *Ask structured questions* ability. The recommended option comes first. If nobody answers, use the defaults and state them. With a question tool that caps questions per call (Claude Code: 4 questions × 4 options, plus an automatic "Other"), run the intake as two calls back to back. In a plain chat message, send round 1, wait for the answer, then send round 2. Either way, ask before any heavy work starts. Wherever this section says "Other", the chat fallback is the "Otro: …" line.
+Skip every question the user config already answers (see *User config*), and state the reused answers in one line. Ask using the *Ask structured questions* ability. The recommended option comes first. If nobody answers, use the defaults and state them. With a question tool that caps questions per call (Claude Code: 4 questions × 4 options, plus an automatic "Other"), run the intake as two calls back to back. In a plain chat message, send round 1, wait for the answer, then send round 2. Either way, ask before any heavy work starts. Wherever this section says "Other", the chat fallback is the "Otro: …" line.
 
 ### Round 1: what to add
 
@@ -257,12 +278,20 @@ Field notes:
 
 ## Voice cloning (optional)
 
-`scripts/voice_clone.py` generates Spanish speech in the speaker's own voice with Chatterbox Multilingual (zero-shot, from about 10 s of their speech). It has two uses, and nothing else:
+`scripts/voice_clone.py` generates Spanish speech in the speaker's own voice, zero-shot from about 10 s of their speech. Pick the engine with `voice.engine` (or the user config):
+
+| Engine | Where it runs | Notes |
+|---|---|---|
+| `voxcpm` (default) | local, VoxCPM2, Apache-2.0, 48 kHz | Best Spain-Spanish accent and naturalness in our blind test. Needs the reference transcript (`ref.txt` next to `ref_file`, or taken from the transcript for a `ref` span). `pip install voxcpm soundfile`. |
+| `chatterbox` | local, MIT | Lighter, but tends towards a Latin American accent. |
+| `elevenlabs` | ElevenLabs API, paid | Highest quality. The user needs an account whose plan includes voice cloning, and the key in the environment variable named by `api_key_env`. The voice is cloned once and its id cached in `elevenlabs.json` next to the reference. Uploading a voice to a third party needs the speaker's consent for that service too, so ask. |
+
+Run `voice_clone.py` with the Python environment of the chosen engine (`_shared/envs/<engine>`). It has two uses, and nothing else:
 - **Voice patch** (`edit.json` → `voice_patches`, source time): replaces the audio of a word range, for example a mispronounced name or a wrong figure. The clip is fitted to the original span: sped up by at most ×1.2, or padded with room tone if it is shorter. So no timestamp moves and the video frames stay. Then fix those words' text in `transcript.json` as usual, so the captions match.
 - **Voice-over** (`timeline.json` → `voiceover`, edited time): a new line laid over the edit, typically over a full-screen animation or a scene where the face is covered. The speech underneath is ducked. With `extend`, a series of voice-overs can narrate full-screen scenes after the real footage, for example adapting an article the user provides. Keep each line under about 250 characters (one idea per scene); long lines degrade.
 
 Rules:
-1. **Consent first.** Clone only the voice of the person in the video, and only when the user confirms it is their own voice or that they have that person's permission. Ask explicitly before the first use. Record it as `"voice": {"consent": true}` in `edit.json`; the script refuses to run without it. Never clone a voice from any other recording.
+1. **Consent first.** Clone only the voice of the person in the video, and only when the user confirms it is their own voice or that they have that person's permission. Ask explicitly before the first use. Record it as `"voice": {"consent": true}` in `edit.json` and in `speakers.<id>.consent` of the user config; the script refuses to run without it. Never clone a voice from any other recording.
 2. **Lip sync.** A patch changes the sound but not the mouth. Use it for one to four words, ideally where the change is hard to see (similar mouth shapes, a zoom, an animation or B-roll covering the face). For longer changes, prefer cutting or a re-recording, and say so.
 3. **Keep the text short and natural.** Write it the way the speaker talks, with the same register. Write numbers as words ("veinticinco por ciento"). A patch must be about as long as the words it replaces. If the script says the clip is too long, shorten the text or widen the word range.
 4. **Listen before using.** After each run, play `work/voice/<id>.wav` (or have the user play it) and check the pronunciation, especially names and anglicisms. If the clip sounds wrong, rephrase, adjust `exaggeration` (0.3 for calm, 0.7 for energetic) or change `seed`, then re-run. Unchanged lines are not regenerated.

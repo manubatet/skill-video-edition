@@ -1,0 +1,27 @@
+{
+  "projects_dir": "Projects",
+  "ask": "missing",
+  "update_repo": "manubatet/skill-video-edition",
+  "defaults": {
+    "captions": {"mode": "karaoke", "position": "middle", "y": 0.64, "max_words": 3, "size": 0.06},
+    "effects": ["zooms", "sfx", "animations"],
+    "anim_style": "flat2d",
+    "palette": "calma",
+    "font": "Arial Rounded MT Bold",
+    "loudness": -14
+  },
+  "glossary": ["Maria Palau"],
+  "speakers": {
+    "maria-palau": {
+      "name": "Maria Palau",
+      "title": "Doctora en psicología",
+      "voice_ref": "Projects/_shared/voices/maria-palau/ref.wav",
+      "consent": "2026-10-10: permission to clone her voice for commercial social-media videos"
+    }
+  },
+  "voice": {
+    "engine": "voxcpm",
+    "api_key_env": "ELEVENLABS_API_KEY",
+    "elevenlabs_model": "eleven_multilingual_v2"
+  }
+}
