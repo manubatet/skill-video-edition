@@ -17,7 +17,7 @@ Existing auto-editors are closed SaaS products, work poorly in Spanish, and deco
 3. The pipeline is reproducible and editable: every decision lives in a JSON file, so changing one cue never requires redoing the whole edit.
 4. It is 100% open-source tooling plus any skills-capable LLM agent, and runs locally.
 
-**Non-goals (v1).** Filler-word removal (explicitly rejected). Multi-camera editing. Background music. Auto-reframing between aspect ratios. Combining videos. Stock B-roll. Languages other than Spanish.
+**Non-goals (v1).** Filler-word removal (explicitly rejected). Multi-camera editing. Background music. Auto-reframing between aspect ratios. Combining videos. Stock B-roll. Languages other than Spanish. Dubbing or translating videos with a cloned voice.
 
 **User flow.** Upload video → two short question rounds (effects, then style guide: animation style and colour palette) → transcript and cut review → preview with QA → final video plus title, description, hashtags and thumbnail picks.
 
@@ -64,6 +64,7 @@ video ─► transcribe.py ─► transcript.json ──(agent: retakes)──�
 | Animation rendering | Pillow and numpy | MIT-CMU, BSD |
 | SFX synthesis | numpy | BSD |
 | Optional denoising | DeepFilterNet | MIT/Apache |
+| Optional voice cloning (patches, short voice-overs) | Chatterbox Multilingual | MIT |
 | Font | Montserrat | OFL |
 
 **Success metrics.**

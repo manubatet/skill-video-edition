@@ -48,9 +48,12 @@ def clean(text, upper):
     return text.upper() if upper else text
 
 
-def anchor_xy(position, w, h):
+def anchor_xy(position, w, h, y=None):
+    """Caption centre. `y` (0-1, captions.y) overrides the preset height."""
     vertical = h > w
     x = int(w * (0.47 if vertical else 0.5))  # vertical: nudge left of TikTok/Reels side buttons
+    if y is not None:
+        return x, int(h * y)
     y = {"bottom": 0.72 if vertical else 0.88,
          "middle": 0.56,
          "top": 0.20 if vertical else 0.12}[position]
@@ -104,7 +107,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     if cap["mode"] == "off":
         return header
     words = transcript["words"]
-    x, y = anchor_xy(cap["position"], w, h)
+    x, y = anchor_xy(cap["position"], w, h, cap.get("y"))
     pos = f"\\pos({x},{y})"
     pop = "\\fscx82\\fscy82\\t(0,90,\\fscx100\\fscy100)" if cap["pop"] else ""
 

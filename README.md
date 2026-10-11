@@ -6,13 +6,14 @@
 
 - **Transcribe** con marcas de tiempo por palabra (WhisperX large-v3 y alineación en español). Admite un glosario de nombres y marcas.
 - **Corta** repeticiones de toma, tartamudeos y silencios largos. **Nunca** quita las muletillas, porque forman parte de la voz de quien habla.
-- **Limpia el audio**: reducción de ruido suave y normalización a -14 LUFS en dos pasadas.
+- **Limpia el audio**: reducción de ruido solo si hace falta (el audio limpio no se toca) y normalización a -14 LUFS en dos pasadas.
 - **Subtítulos** incrustados en tres modos (karaoke, palabra a palabra o frases) y tres posiciones, respetando las zonas seguras de TikTok y Reels. Las palabras clave se resaltan.
 - **Zooms graduales**: acercamientos suaves centrados en la cara que tardan 0,7 s en entrar y en salir, en lugar de cortes.
 - **Efectos de sonido** sintetizados, libres de derechos y colocados con moderación.
 - **Animaciones programadas**: el agente escribe cada animación en Python y se superpone con transparencia. Pueden ser tarjetas, contadores, sellos, barras de progreso o escenas 2D a pantalla completa.
 - **Guía de estilo**: 4 estilos de animación y 4 paletas de 5 colores con contraste verificado, o colores propios en HEX.
 - **Control de ritmo**: un validador bloquea las líneas de tiempo sobrecargadas.
+- **Clonación de voz** (opcional): corrige una palabra o frase mal dicha, o añade una voz en off corta, con la voz de quien habla (Chatterbox Multilingual, MIT). Solo con consentimiento explícito y sin doblaje.
 - **Extras**: propuesta de título, descripción, hashtags y miniaturas.
 
 ### Cómo trabaja
@@ -37,7 +38,7 @@ social-video-editor/          ← el skill (lo que se instala)
 ├── SKILL.md                  ← procedimiento para el agente
 ├── scripts/                  ← pipeline determinista (Python + FFmpeg)
 │   ├── transcribe.py  build_edit.py  captions.py  render.py
-│   └── anim_kit.py  sfx_synth.py  common.py
+│   └── anim_kit.py  sfx_synth.py  voice_clone.py  align_voice.py  common.py
 ├── references/PRD.md         ← producto: objetivos, requisitos, roadmap
 └── agents/openai.yaml        ← metadatos opcionales para ChatGPT / Codex
 .claude/skills/social-video-editor  → enlace para Claude Code
@@ -55,9 +56,21 @@ social-video-editor/          ← el skill (lo que se instala)
 
 Después, sube tu vídeo y pide algo como *"edita este vídeo para redes"*, o invoca el skill por su nombre (`/social-video-editor` en Claude Code).
 
+## Carpeta de proyectos
+
+La primera vez, el skill te pregunta dónde guardar los proyectos (por defecto, `Projects/`) y lo recuerda en `.social-video-editor.json`. Ahí se queda todo lo reutilizable, para no descargar ni rehacer nada en el siguiente vídeo:
+
+```
+Projects/
+├── _shared/          modelos (HF_HOME), entornos de Python, voces clonadas, fuentes, SFX y animaciones reutilizables
+└── <vídeo>/          scripts/, work/ (transcripción, JSON de decisiones, animaciones, voz) y final/ (vídeo final + textos)
+```
+
+La carpeta está en `.gitignore`: los vídeos y los pesos de los modelos nunca se suben a GitHub.
+
 ## Requisitos
 
-- Python 3.9 o superior y **FFmpeg compilado con libass** (`ffmpeg -filters | grep " ass "`).
+- Python 3.9 o superior y **FFmpeg compilado con libass** (vale cualquier versión, también la 8 y posteriores) (`ffmpeg -filters | grep " ass "`).
 - `pip install whisperx numpy pillow opencv-python-headless`
   - En el Python de sistema de Debian/Ubuntu, instala dentro de un entorno virtual (`python3 -m venv .venv`).
   - Sin GPU, añade `--extra-index-url https://download.pytorch.org/whl/cpu`.
@@ -65,6 +78,7 @@ Después, sube tu vídeo y pide algo como *"edita este vídeo para redes"*, o in
 - Opcional:
   - token de Hugging Face (detección de hablantes);
   - DeepFilterNet (mejor reducción de ruido);
+  - `chatterbox-tts` y `setuptools<80` (clonación de voz, Python 3.10–3.12; si choca con WhisperX, en un entorno virtual aparte);
   - Montserrat ExtraBold en `work/fonts/`.
 
 La GPU es opcional: en CPU funciona con int8, aunque más despacio.

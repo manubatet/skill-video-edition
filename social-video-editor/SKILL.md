@@ -11,7 +11,8 @@ Turns a raw Spanish talking-head video into a social-ready edit:
 - burned-in captions with highlighted keywords;
 - gradual (eased) push-in zooms;
 - sparse sound effects;
-- custom animations that the agent writes as code.
+- custom animations that the agent writes as code;
+- optional voice cloning to fix a flubbed phrase or add a short voice-over in the speaker's own voice.
 
 This skill follows the open Agent Skills format, so the same folder works in Claude (Claude Code, claude.ai), ChatGPT and Codex. What it contains:
 - `SKILL.md`: the procedure;
@@ -52,13 +53,34 @@ Before Setup, do one simple, non-blocking check:
 
 ```bash
 LOCAL=$(cat VERSION 2>/dev/null || echo unknown)
-REMOTE=$(curl -s --max-time 3 https://api.github.com/repos/manubatet/skill-video-edition/commits/main | grep -m1 '"sha"' | cut -d'"' -f4 | cut -c1-7)
+REPO=manubatet/skill-video-edition   # or update_repo from the user config
+REMOTE=$(curl -s --max-time 3 https://api.github.com/repos/$REPO/commits/main | grep -m1 '"sha"' | cut -d'"' -f4 | cut -c1-7)
 echo "local=$LOCAL remote=${REMOTE:-unreachable}"
 ```
 
 - No network, or `curl` fails: skip silently and continue. This never blocks the run.
 - `REMOTE` differs from `LOCAL`: say so in one line, for example "Tu skill social-video-editor no está actualizada (local `81108d2`, remoto `a1b2c3d`). Actualízala desde https://github.com/manubatet/skill-video-edition (`git pull` si trabajas dentro del repo, o vuelve a copiar/descargar la carpeta `social-video-editor/` si la usas suelta)." Then continue normally; do not wait for the user to update.
 - If this skill folder is itself a checkout of that repo (`.git` present and `git remote -v` shows `skill-video-edition`), prefer `git fetch origin -q && git rev-list --count HEAD..origin/main` — a non-zero count means updates are available, and `git pull --ff-only` applies them.
+
+## User config (`.social-video-editor.json`)
+
+Read this file from the current working directory at the start of every run, before the update check. It holds the user's standing answers, so the intake only asks what is new for this video. The template is `config.example.json` next to this `SKILL.md`.
+
+| Key | Holds | Replaces |
+|---|---|---|
+| `projects_dir` | where projects and `_shared/` live | Setup step 1 question |
+| `ask` | `"missing"` (default): ask only what the config doesn't answer. `"always"`: ask everything, with the config's answers as the recommended options | — |
+| `update_repo` | `owner/repo` for the update check | the repository hard-coded below |
+| `defaults.captions`, `.effects`, `.anim_style`, `.palette`, `.font`, `.loudness` | the house style: `palette` is a preset key or `{"fondo", "texto", "principal", "secundario", "alerta"}` in HEX | intake questions 1–3, 5 and 6 |
+| `glossary` | names and brands for `--glossary` (merged with any new ones) | the glossary invite |
+| `speakers.<id>` | `name` and `title` for lower thirds, `voice_ref` (saved reference wav), `consent` (who allowed what, and when) | re-asking the name and title, picking a voice reference, and the consent question when the use matches |
+| `voice` | `engine` (`voxcpm` \| `chatterbox`), `steps` | the engine choice |
+
+Rules:
+- **Say what you are reusing.** When the config answers intake questions, skip them, and say so in one line so the user can override, for example: "Uso tu configuración: karaoke al 64 %, flat 2D, paleta Calma, voz VoxCPM2. Dime si cambias algo."
+- **Offer to save.** At the end of a run, if the user answered questions the config doesn't cover (a new speaker, a custom palette, a projects folder), offer to save those answers. Write the file only after they agree.
+- **Never store secrets.** Credentials (API keys, tokens) never go in this file or in any project file. The config holds only the *name* of the environment variable (`api_key_env`). The key lives in the user's shell profile, the system keychain or a git-ignored `.env`. If the variable is missing, tell the user how to set it; never ask them to paste the key in chat.
+- The file is personal: keep it out of git (add it to `.gitignore`).
 
 ## Runtime profiles
 
@@ -82,7 +104,22 @@ Then pick the profile that matches:
 
 The pipeline needs Python 3.9+, FFmpeg built with libass, and a machine that can download the Whisper models from Hugging Face. A GPU is optional: CPU with int8 works but is slower. On Apple Silicon, WhisperX runs on CPU.
 
-1. **Project management: one folder per project.** Create a project folder named `<video-name>_edit/` **inside the current working directory** (where the agent is running), not next to the source video if that file lives elsewhere (Downloads, a temp upload path, etc.) — copy or symlink the video into the project folder instead. This folder holds everything for that project: the video, `scripts/`, `work/` (transcript, edit decisions, timeline, renders) and any extras. Every command below runs from inside that folder. If a folder with that name already exists for a different video, ask the user for a project name rather than overwriting it. Never mix two projects' `work/` in the same folder.
+1. **Projects folder (ask once, then reuse).** If the user config has `projects_dir`, use it without asking. Otherwise ask the user where to keep their video projects. Recommend `Projects/` inside the current working directory, and accept any path they give. Explain that this folder will hold the finished videos and everything worth reusing: model weights, Python environments, voices, fonts, SFX and animations. Save the answer as `{"projects_dir": "<path>"}` in `.social-video-editor.json`. If the working directory is a git repository, add the projects folder to `.gitignore`, because media and weights never go to git. Layout:
+   ```
+   <projects_dir>/
+   ├── _shared/                  reused by every project
+   │   ├── models/               HF_HOME: Whisper, alignment and TTS weights, downloaded once
+   │   ├── envs/                 .venv (WhisperX) and .venv-voice (TTS)
+   │   ├── voices/<speaker>/     ref.wav + ref.txt + consent.txt, to clone the same speaker again
+   │   ├── fonts/  sfx/          caption fonts and the SFX library
+   │   └── anims/                animations worth reusing (copy the .py and re-run it with the new style)
+   └── <video-name>/             one folder per video
+       ├── <source video>        a copy or a symlink, never moved from where the user keeps it
+       ├── scripts/              this skill's scripts
+       ├── work/                 transcript, edit.json, timeline.json, anims/, voice/, previews
+       └── final/                final.mp4 + extras.md (title, description, hashtags, thumbnails)
+   ```
+   Before running any script, `export HF_HOME=<projects_dir>/_shared/models`, so model downloads land in `_shared/` and are reused. Run Python from `_shared/envs/`. Link `work/fonts` to `_shared/fonts`, and pass `--sfx <projects_dir>/_shared/sfx` to `render.py`. Every command below runs from inside the project folder. If a folder with that name already exists for a different video, ask for a project name rather than overwriting it. Never mix two projects' `work/` in the same folder.
 2. Copy this skill's `scripts/` folder (next to this `SKILL.md`) into `<project>/scripts/`. Do not rewrite the scripts.
 3. Install and check the dependencies:
    ```bash
@@ -96,12 +133,13 @@ The pipeline needs Python 3.9+, FFmpeg built with libass, and a machine that can
    - **Better denoising.** `pip install deepfilternet`, then set `"denoise": "deepfilter"`.
    - **Caption font.** Put a bold TTF (default: Montserrat ExtraBold, OFL license) in `work/fonts/`. Set `style.font` to the font's family name. Without it, captions fall back to a system font.
    - **Better SFX.** Any `.wav` placed in `sfx/` with the same name (for example a CC0 `whoosh.wav` from Freesound) replaces the synthesized one.
+   - **Voice cloning.** VoxCPM2 (default): `pip install voxcpm soundfile` in its own venv. Chatterbox: `pip install chatterbox-tts "setuptools<80"` (Chatterbox Multilingual, MIT; its watermarker still imports `pkg_resources`, which newer setuptools removed). Use Python 3.10–3.12. It pins its own `torch`; if that clashes with WhisperX, install it in a separate venv (`python3 -m venv .venv-voice`) and run only `voice_clone.py` from there. The first run downloads the model from Hugging Face. It runs on CUDA, Apple MPS or CPU (CPU takes a few seconds per line). Install it only when the user wants a voice fix.
 
 If a model download is blocked (sandboxed or offline machine), switch to runtime profile 2.
 
 ## Intake: two quick rounds
 
-Ask using the *Ask structured questions* ability. The recommended option comes first. If nobody answers, use the defaults and state them. With a question tool that caps questions per call (Claude Code: 4 questions × 4 options, plus an automatic "Other"), run the intake as two calls back to back. In a plain chat message, send round 1, wait for the answer, then send round 2. Either way, ask before any heavy work starts. Wherever this section says "Other", the chat fallback is the "Otro: …" line.
+Skip every question the user config already answers (see *User config*), and state the reused answers in one line. Ask using the *Ask structured questions* ability. The recommended option comes first. If nobody answers, use the defaults and state them. With a question tool that caps questions per call (Claude Code: 4 questions × 4 options, plus an automatic "Other"), run the intake as two calls back to back. In a plain chat message, send round 1, wait for the answer, then send round 2. Either way, ask before any heavy work starts. Wherever this section says "Other", the chat fallback is the "Otro: …" line.
 
 ### Round 1: what to add
 
@@ -163,20 +201,23 @@ Show the user three things:
   - one line on the **look**: the chosen palette (key and its 5 HEX codes), the `anim_style` row, the font and the entry/hold/exit timing;
   - when zooms or emphasis words are on, a short list of the sentences that get a zoom and the words that get highlighted.
 
-  Offer optional extras as a separate "Opcional" line instead of silently adding them.
+  Offer optional extras as a separate "Opcional" line instead of silently adding them. When a phrase is mispronounced, wrong or flubbed and there is no clean take to keep, offer a **voice patch** there (see *Voice cloning*), quoting the words and the proposed replacement text.
 
 Ask them to correct wrong words, confirm the cuts and approve or change the table. After the cuts, carry the approved rows into `timeline.json` with edited times. If the user asks to see the plan again, re-show it in the same table.
 
 To apply text fixes, edit the `text` of words in `work/transcript.json` with a small Python snippet. Keep word count and timings unchanged. If a fix merges or splits words, adjust only the text and keep the original number of word entries. Then write `work/edit.json` (schema in `build_edit.py`'s docstring).
 
+### 2b. Voice patches (only if approved at Checkpoint 1)
+Add `voice` and `voice_patches` to `work/edit.json` and run `python scripts/voice_clone.py --work work`, then listen to the clips (see *Voice cloning*). Do this before step 3, because `build_edit.py` splices the clips in.
+
 ### 3. Cut and clean
 ```bash
 python scripts/build_edit.py --work work
 ```
-This writes `work/cut.mkv` (cuts, light denoise, two-pass loudness normalization to -14 LUFS), `work/segments.json` and `work/transcript_edited.json/.txt`. Report the before and after duration.
+This writes `work/cut.mkv` (cuts, denoise only if the pauses are noisy, two-pass loudness normalization to -14 LUFS), `work/segments.json` and `work/transcript_edited.json/.txt`. Report the before and after duration.
 
 ### 4. Classify and plan effects
-Read `transcript_edited.json`. Then write `work/timeline.json` (schema below), following *Editorial rules* and the table approved at Checkpoint 1. Include the `classification` array: it documents the reasoning and makes later changes easy to discuss. If an approved row cannot be placed as agreed (for example two animations now violate `anim_min_gap`), show the updated table and say what changed.
+Read `transcript_edited.json`. Then write `work/timeline.json` (schema below), following *Editorial rules* and the table approved at Checkpoint 1. Include the `classification` array: it documents the reasoning and makes later changes easy to discuss. If an approved row cannot be placed as agreed (for example two animations now violate `anim_min_gap`), show the updated table and say what changed. If the plan has `voiceover` entries, run `voice_clone.py` again now: it only generates the new lines. Then run `python scripts/align_voice.py --work work` in the WhisperX environment, so the voice-overs get captions.
 
 ### 5. Code the animations
 For each entry in `animations`, write `work/anims/<id>.py` using `anim_kit` (see *Animation guide*). Run it. Then **open the generated `<id>_sheet.png` and look at it** (*Look at images*) before continuing. Fix overflowing text, clipped shapes, unreadable contrast and timing that looks wrong.
@@ -195,7 +236,7 @@ Send `work/preview.mp4` and a three-line summary of what was added. Apply feedba
 ```bash
 python scripts/render.py --work work
 ```
-Deliver `work/final.mp4`. Also give the extras in the reply, derived from the transcript:
+Copy `work/final.mp4` to `final/` and deliver it from there. Also give the extras in the reply, and save them to `final/extras.md`. Derive them from the transcript:
 - a title (up to 60 characters);
 - a description (2–3 lines, Spanish);
 - 5–8 hashtags;
@@ -216,6 +257,8 @@ Deliver `work/final.mp4`. Also give the extras in the reply, derived from the tr
   "sfx": [{"at": 5.0, "sound": "whoosh", "gain_db": -10}],
   "animations": [{"id": "a1", "file": "work/anims/a1.mov", "start": 2.15, "anchor": "upper-third",
                   "hide_captions": false}],
+  "voiceover": [{"id": "v1", "at": 18.2, "text": "Y guarda este vídeo para luego.", "duck_db": -24, "gain_db": 0}],
+  "extend": 0,
   "zoom_center": null,
   "rules": {}
 }
@@ -223,13 +266,47 @@ Deliver `work/final.mp4`. Also give the extras in the reply, derived from the tr
 
 Field notes:
 - **`captions.mode`**: `karaoke` | `word` | `sentence` | `off`.
-- **`captions.position`**: `bottom` | `middle` | `top`. Positions already respect the TikTok and Reels safe zones for vertical video.
+- **`captions.position`**: `bottom` | `middle` | `top`. Positions already respect the TikTok and Reels safe zones for vertical video. For an in-between height, set `captions.y` (0–1 of the frame height, e.g. 0.64 for "middle, a bit lower"); it overrides `position`. Keep it above 0.80 on vertical video.
 - **`sfx.at`**: the moment the sound should *land*. `render.py` subtracts each sound's lead time automatically, for example 0.22 s for `whoosh` and 1.2 s for `riser`. Set `"align": "start"` to disable this.
 - **Available sounds**: `whoosh` (transitions, new point), `pop` (a word or card appears), `ding` (number or result), `click` (list item), `riser` (build-up before a reveal), `boom` (big claim, use at most once per video).
 - **`animations.anchor`**: `top` | `upper-third` | `center` | `lower-third`. Alternatively give explicit `x` and `y` in pixels for the top-left corner. Use `hide_captions: true` when an animation replaces the captions for its duration.
 - **`zooms`**: every zoom is a **gradual push-in**, never a hard cut. The scale eases in (smoothstep) over `ramp` seconds from `start`, holds, then eases back out over `ramp` seconds before `end`. The default `ramp` is **0.7 s**, capped at half the zoom length. Keep the default; lower it (0.35) only when the user asks for a snappier style. `"ramp": 0` gives the old hard punch-in, so use it only when the user asks for jump-cut style. Because the ramp eats into the zoom, start it about `ramp`/2 (≈0.3 s) before the key word, so the zoom is fully in when the word lands. Make zooms at least 1.4 s long, so both full ramps fit. Shorter ones never reach full scale and read as a quick breathe-in.
 - **`zoom_center`**: leave it `null`. It is detected from the face, falling back to `[0.5, 0.4]`. Set it by hand when the source has burned-in text that the zoom would cut in half. Choose a centre whose crop either keeps that text whole or leaves it out entirely.
+- **`voiceover`**: a line in the speaker's cloned voice, starting at `at`. The speech track is ducked by `duck_db` (default -24; -60 mutes it) while it plays. The clip must already exist (`voice_clone.py`), and it must end inside the video. It is captioned like the speech once `align_voice.py` has aligned its words; speech under a muted voice-over (`duck_db` ≤ -40) is left out of the captions. See *Voice cloning*.
+- **`extend`**: seconds added after the end of the cut (the last frame is held and silence is padded) for full-screen animated scenes narrated by `voiceover`, for example a segment that explains an article after the speaker's real intro. Cover the whole extension with opaque full-screen animations (box = frame size, `x: 0, y: 0`); scenes may run back to back, so set `rules.anim_min_gap` to 0 (full-frame boxes skip the caption-band and UI-zone warnings). Keep the caption band free in the scene design, because captions are drawn on top.
 - **`rules`**: overrides the density limits in `render.py` (`RULES`). Change a limit only when the user asks for a denser or calmer style.
+
+## Voice cloning (optional)
+
+`scripts/voice_clone.py` generates Spanish speech in the speaker's own voice, zero-shot from about 10 s of their speech. Pick the engine with `voice.engine` (or the user config):
+
+| Engine | Where it runs | Notes |
+|---|---|---|
+| `voxcpm` (default) | local, VoxCPM2, Apache-2.0, 48 kHz | Best Spain-Spanish accent and naturalness in our blind test. Needs the reference transcript (`ref.txt` next to `ref_file`, or taken from the transcript for a `ref` span). `pip install voxcpm soundfile`. |
+| `chatterbox` | local, MIT | Lighter, but tends towards a Latin American accent. |
+| `elevenlabs` | ElevenLabs API, paid | **Disabled for now** (do not offer it). The code stays in `voice_clone.py` (`DISABLED_ENGINES`) for when it is enabled again. |
+
+Run `voice_clone.py` with the Python environment of the chosen engine (`_shared/envs/<engine>`). It has two uses, and nothing else:
+- **Voice patch** (`edit.json` → `voice_patches`, source time): replaces the audio of a word range, for example a mispronounced name or a wrong figure. The clip is fitted to the original span: sped up by at most ×1.2, or padded with room tone if it is shorter. So no timestamp moves and the video frames stay. Then fix those words' text in `transcript.json` as usual, so the captions match.
+- **Voice-over** (`timeline.json` → `voiceover`, edited time): a new line laid over the edit, typically over a full-screen animation or a scene where the face is covered. The speech underneath is ducked. With `extend`, a series of voice-overs can narrate full-screen scenes after the real footage, for example adapting an article the user provides. Keep each line under about 250 characters (one idea per scene); long lines degrade.
+
+Rules:
+1. **Consent first.** Clone only the voice of the person in the video, and only when the user confirms it is their own voice or that they have that person's permission. Ask explicitly before the first use. Record it as `"voice": {"consent": true}` in `edit.json` and in `speakers.<id>.consent` of the user config; the script refuses to run without it. Never clone a voice from any other recording.
+2. **Lip sync.** A patch changes the sound but not the mouth. Use it for one to four words, ideally where the change is hard to see (similar mouth shapes, a zoom, an animation or B-roll covering the face). For longer changes, prefer cutting or a re-recording, and say so.
+3. **Keep the text short and natural.** Write it the way the speaker talks, with the same register. Write numbers as words ("veinticinco por ciento"). A patch must be about as long as the words it replaces. If the script says the clip is too long, shorten the text or widen the word range.
+4. **Listen before using.** After each run, play `work/voice/<id>.wav` (or have the user play it) and check the pronunciation, especially names and anglicisms. Transcribe the clips back with Whisper and compare them with the text: a changed word ("hacer" for "nacer") is a mispronunciation. If a clip sounds wrong, give that line its own `"seed"` (re-rolls only that take), rephrase it, or adjust `exaggeration` (chatterbox: 0.3 for calm, 0.7 for energetic), then re-run. Unchanged lines are not regenerated.
+5. **Reference.** Never run a denoiser on a reference: the model clones its artifacts as a metallic, robotic timbre. By default the script picks the best 8–15 s of continuous, clean speech that is not cut or patched. If that stretch has music, noise or another voice, set `voice.ref` to `[start, end]` in source seconds.
+6. **No dubbing or translation.** This skill does not translate or re-voice whole videos.
+7. **Narrated scenes.** When the voice-over says new things (not a fix), show the script to the user at Checkpoint 1 and get it approved before generating. Adapt source material to the speaker's register and to social media: short sentences, second person, one idea per line, and a closing CTA. Never invent claims that are not in the source.
+
+`edit.json` example:
+```json
+{"voice": {"consent": true, "ref": null, "exaggeration": 0.5, "cfg_weight": 0.5, "seed": 7},
+ "voice_patches": [{"id": "p1", "words": [120, 122], "text": "el veinticinco por ciento"}]}
+```
+Ids are shared by patches and voice-overs, so they must be unique across both files. The clips go to `work/voice/`.
+
+**Reusing a voice.** After a speaker's first project, save the reference to `_shared/voices/<speaker>/`: `ref.wav` (copy `work/voice/ref.wav`), `ref.txt` (its transcript) and `consent.txt` (who gave permission, and when). In later projects, set `"voice": {"consent": true, "ref_file": "<projects_dir>/_shared/voices/<speaker>/ref.wav"}`, so the same voice is used without picking a reference again. Ask about consent again if the use is different from the one recorded.
 
 ## Editorial rules
 
@@ -267,7 +344,7 @@ Field notes:
 Each animation is one Python file using `scripts/anim_kit.py`. It renders to a transparent `.mov` that is overlaid on the video. The API:
 - `Anim(w, h, duration, fps=30)`: sets the size of the animation box, not the full frame. Keep boxes small; typical sizes are 600–900 × 200–450 px for a 1080-wide video.
 - `@anim.draw def frame(c, t)`: `t` is in seconds.
-- Primitives: `c.rect`, `c.circle`, `c.line`, `c.arc`, `c.text`.
+- Primitives: `c.rect`, `c.circle`, `c.line`, `c.arc`, `c.polygon`, `c.text`.
 - `c.group(scale, alpha, origin, dx, dy, rotate)` animates several elements as one unit.
 - `c.progress(t, start, dur)` returns a local 0–1 progress value, to pass through `ease.*` (`out_back`, `out_cubic`, `in_cubic`, `in_out_cubic`, `out_quint`, `out_elastic`).
 - `c.fit(text, max_w, size)`: **always** use it for text that must fit a shape.
@@ -352,6 +429,7 @@ All four keep at least 3:1 WCAG contrast for every role on `fondo`, and at least
 - `render.py --check` passes with no RULE lines. WARN lines are either fixed or deliberately accepted.
 - Cuts sound natural: no clipped word starts. If a word start is clipped, raise `pad` to 0.15–0.2 s.
 - Audio and video have equal durations (`ffprobe` both streams).
+- Voice patches and voice-overs match the speaker's level and tone, and do not stand out at the joins. Any lip-sync mismatch is hidden or minimal.
 
 ## Troubleshooting
 
@@ -362,7 +440,11 @@ All four keep at least 3:1 WCAG contrast for every role on `fondo`, and at least
 | Wrong names in captions | `--glossary`, or fix the word texts at Checkpoint 1 |
 | Captions use the wrong font | the font file is missing from `work/fonts/`, or `style.font` doesn't match its family name (`fc-scan file.ttf`) |
 | Zoom crops the face | set `zoom_center` manually to `[x, y]` (normalized face position) |
-| Audio pumps or sounds robotic | `"denoise": "off"` |
+| Audio pumps or sounds robotic | `"denoise": "off"` (the default `auto` only denoises when the pauses are noisy, above -50 dBFS) |
+| Cloned voice doesn't sound like the speaker | set `voice.ref` to a cleaner 10–15 s stretch; lower `exaggeration` |
+| Cloned voice sounds robotic or metallic | the reference was denoised (rebuild it with only `highpass=f=60`); with `voxcpm`, raise `voice.steps` to 25–30 |
+| Cloned voice is rushed or flat | lower `cfg_weight` (0.3) for a slower delivery; raise `exaggeration` for energy |
+| `filter_complex_script` not recognized | FFmpeg 8+ removed it; the scripts detect the version, so recopy `scripts/` from the skill |
 
 ## Roadmap hooks (don't build unless asked)
 

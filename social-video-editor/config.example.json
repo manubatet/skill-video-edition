@@ -1,0 +1,39 @@
+{
+  "projects_dir": "Projects",
+  "ask": "missing",
+  "update_repo": "manubatet/skill-video-edition",
+  "defaults": {
+    "captions": {
+      "mode": "karaoke",
+      "position": "middle",
+      "y": 0.64,
+      "max_words": 3,
+      "size": 0.06
+    },
+    "effects": [
+      "zooms",
+      "sfx",
+      "animations"
+    ],
+    "anim_style": "flat2d",
+    "palette": "calma",
+    "font": "Arial Rounded MT Bold",
+    "loudness": -14
+  },
+  "glossary": [
+    "Nombre Apellido",
+    "Marca"
+  ],
+  "speakers": {
+    "nombre-apellido": {
+      "name": "Nombre Apellido",
+      "title": "Cargo o profesión",
+      "voice_ref": "Projects/_shared/voices/nombre-apellido/ref.wav",
+      "consent": "AAAA-MM-DD: quién dio permiso y para qué uso"
+    }
+  },
+  "voice": {
+    "engine": "voxcpm",
+    "steps": 25
+  }
+}
