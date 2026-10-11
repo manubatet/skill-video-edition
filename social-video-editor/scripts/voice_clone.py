@@ -4,8 +4,8 @@ Usage (in the environment of the chosen engine):
   python voice_clone.py --work work/ [--force] [--device cuda|mps|cpu]
 
 Engines (edit.json "voice.engine"):
-  voxcpm      VoxCPM2 (Apache-2.0, local, 48 kHz). Best Spain-Spanish accent in our tests. Default.
-  chatterbox  Chatterbox Multilingual (MIT, local). Lighter; tends towards a Latin American accent.
+  voxcpm      VoxCPM2 (Apache-2.0, local, 48 kHz). The engine: it won a blind test against
+              Qwen3-TTS and Chatterbox on accent fidelity and naturalness.
   elevenlabs  ElevenLabs API (paid, cloud). DISABLED for now: load_elevenlabs is kept and tested;
               add it back to ENGINES to enable it. Key from the env var in voice.api_key_env.
 
@@ -19,11 +19,9 @@ Settings (edit.json "voice", all optional except consent):
     "ref": [31.2, 43.0],      # source seconds of clean speech to clone from; null = pick automatically
     "ref_file": null,         # or a saved reference wav (e.g. _shared/voices/<speaker>/ref.wav);
                               # its transcript goes in ref.txt next to it (voxcpm needs it)
-    "engine": "voxcpm",       # voxcpm | chatterbox | elevenlabs
+    "engine": "voxcpm",       # voxcpm (elevenlabs is disabled for now)
     "steps": 25,              # voxcpm: diffusion steps (10 = fast draft, 25-30 = clean final audio)
     "cfg_value": 2.0,         # voxcpm: guidance; lower sounds looser, higher more literal
-    "exaggeration": 0.5,      # chatterbox: 0.25-1.0, higher = more expressive
-    "cfg_weight": 0.5,        # chatterbox: 0.3-0.7, lower = slower, more deliberate delivery
     "api_key_env": "ELEVENLABS_API_KEY",   # elevenlabs: env var holding the key (never the key itself)
     "elevenlabs_model": "eleven_multilingual_v2",
     "seed": 7
@@ -49,11 +47,9 @@ sys.path.insert(0, str(Path(__file__).parent))
 from common import die, load, need, run, save, wav_duration  # noqa: E402
 
 VOICE_DEFAULTS = {"consent": False, "ref": None, "ref_file": None, "engine": "voxcpm", "steps": 25,
-                  "cfg_value": 2.0, "exaggeration": 0.5,
-                  "cfg_weight": 0.5, "api_key_env": "ELEVENLABS_API_KEY",
+                  "cfg_value": 2.0, "api_key_env": "ELEVENLABS_API_KEY",
                   "elevenlabs_model": "eleven_multilingual_v2", "seed": 7}
-ENGINE_SETTINGS = {"voxcpm": ("steps", "cfg_value", "seed"), "chatterbox": ("exaggeration", "cfg_weight", "seed"),
-                   "elevenlabs": ("elevenlabs_model", "seed")}
+ENGINE_SETTINGS = {"voxcpm": ("steps", "cfg_value", "seed"), "elevenlabs": ("elevenlabs_model", "seed")}
 REF_MIN, REF_IDEAL, REF_MAX = 5.0, 8.0, 15.0  # seconds of reference speech
 ELEVENLABS_API = "https://api.elevenlabs.io/v1"
 SR = 48000
@@ -165,28 +161,6 @@ def pick_device(requested):
     return "cpu"
 
 
-def load_chatterbox(device, ref, ref_text, cfg, work):
-    try:
-        from chatterbox.mtl_tts import ChatterboxMultilingualTTS
-    except ImportError:
-        die('Chatterbox is not installed. Run: pip install chatterbox-tts "setuptools<80"')
-    try:
-        model = ChatterboxMultilingualTTS.from_pretrained(device=device)
-    except Exception as e:  # MPS support varies by torch build; CPU always works
-        if device == "cpu":
-            raise
-        print(f"WARNING: could not load on {device} ({e}); falling back to cpu")
-        model, device = ChatterboxMultilingualTTS.from_pretrained(device="cpu"), "cpu"
-
-    def synth(text):
-        import torch
-        torch.manual_seed(cfg["seed"])
-        wav = model.generate(text, language_id="es", audio_prompt_path=str(ref),
-                             exaggeration=cfg["exaggeration"], cfg_weight=cfg["cfg_weight"])
-        return wav.squeeze().detach().cpu().numpy().astype(np.float32), model.sr
-    return synth, f"Chatterbox Multilingual on {device}"
-
-
 def load_voxcpm(device, ref, ref_text, cfg, work):
     try:
         from voxcpm import VoxCPM
@@ -256,7 +230,7 @@ def load_elevenlabs(device, ref, ref_text, cfg, work):
     return synth, f"ElevenLabs {cfg['elevenlabs_model']} (voice {voice_id})"
 
 
-ENGINES = {"voxcpm": load_voxcpm, "chatterbox": load_chatterbox}
+ENGINES = {"voxcpm": load_voxcpm}
 # Turned off until it is needed; enabling it is one line: ENGINES["elevenlabs"] = load_elevenlabs
 DISABLED_ENGINES = {"elevenlabs": load_elevenlabs}
 

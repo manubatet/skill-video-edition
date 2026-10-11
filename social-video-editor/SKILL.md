@@ -49,18 +49,16 @@ Never skip a checkpoint because a tool is missing. Use the fallback instead.
 
 ## Check for updates (once per run)
 
-Before Setup, do one simple, non-blocking check:
+Before Setup, run one quick, non-blocking check. `<skill_dir>` is the folder that contains this `SKILL.md`; pass `--repo` only when the user config sets `update_repo`:
 
 ```bash
-LOCAL=$(cat VERSION 2>/dev/null || echo unknown)
-REPO=manubatet/skill-video-edition   # or update_repo from the user config
-REMOTE=$(curl -s --max-time 3 https://api.github.com/repos/$REPO/commits/main | grep -m1 '"sha"' | cut -d'"' -f4 | cut -c1-7)
-echo "local=$LOCAL remote=${REMOTE:-unreachable}"
+python <skill_dir>/scripts/check_update.py [--repo owner/repo]
 ```
 
-- No network, or `curl` fails: skip silently and continue. This never blocks the run.
-- `REMOTE` differs from `LOCAL`: say so in one line, for example "Tu skill social-video-editor no está actualizada (local `81108d2`, remoto `a1b2c3d`). Actualízala desde https://github.com/manubatet/skill-video-edition (`git pull` si trabajas dentro del repo, o vuelve a copiar/descargar la carpeta `social-video-editor/` si la usas suelta)." Then continue normally; do not wait for the user to update.
-- If this skill folder is itself a checkout of that repo (`.git` present and `git remote -v` shows `skill-video-edition`), prefer `git fetch origin -q && git rev-list --count HEAD..origin/main` — a non-zero count means updates are available, and `git pull --ff-only` applies them.
+It compares the local `VERSION` (a semantic version, `MAJOR.MINOR.PATCH`) with the one published on the repository's `main`, waits at most 3 s, and prints one line:
+- `UP_TO_DATE …` or `UNKNOWN …` (offline, sandbox without network, no `VERSION`): say nothing and continue. This never blocks the run.
+- `UPDATE 1.1.0 -> 1.2.0`: say so in one line, then continue normally without waiting, for example "Hay una versión nueva del skill social-video-editor (tienes la 1.1.0, la última es la 1.2.0). Actualízala desde https://github.com/manubatet/skill-video-edition (`git pull` si trabajas dentro del repo, o vuelve a copiar/descargar la carpeta `social-video-editor/` si la usas suelta)."
+- If this skill folder is itself a checkout of that repo (`.git` present and `git remote -v` shows `skill-video-edition`), `git pull --ff-only` applies the update.
 
 ## User config (`.social-video-editor.json`)
 
@@ -74,7 +72,7 @@ Read this file from the current working directory at the start of every run, bef
 | `defaults.captions`, `.effects`, `.anim_style`, `.palette`, `.font`, `.loudness` | the house style: `palette` is a preset key or `{"fondo", "texto", "principal", "secundario", "alerta"}` in HEX | intake questions 1–3, 5 and 6 |
 | `glossary` | names and brands for `--glossary` (merged with any new ones) | the glossary invite |
 | `speakers.<id>` | `name` and `title` for lower thirds, `voice_ref` (saved reference wav), `consent` (who allowed what, and when) | re-asking the name and title, picking a voice reference, and the consent question when the use matches |
-| `voice` | `engine` (`voxcpm` \| `chatterbox`), `steps` | the engine choice |
+| `voice` | `engine` (`voxcpm`), `steps`, `cfg_value` | the engine settings |
 
 Rules:
 - **Say what you are reusing.** When the config answers intake questions, skip them, and say so in one line so the user can override, for example: "Uso tu configuración: karaoke al 64 %, flat 2D, paleta Calma, voz VoxCPM2. Dime si cambias algo."
@@ -133,7 +131,7 @@ The pipeline needs Python 3.9+, FFmpeg built with libass, and a machine that can
    - **Better denoising.** `pip install deepfilternet`, then set `"denoise": "deepfilter"`.
    - **Caption font.** Put a bold TTF (default: Montserrat ExtraBold, OFL license) in `work/fonts/`. Set `style.font` to the font's family name. Without it, captions fall back to a system font.
    - **Better SFX.** Any `.wav` placed in `sfx/` with the same name (for example a CC0 `whoosh.wav` from Freesound) replaces the synthesized one.
-   - **Voice cloning.** VoxCPM2 (default): `pip install voxcpm soundfile` in its own venv. Chatterbox: `pip install chatterbox-tts "setuptools<80"` (Chatterbox Multilingual, MIT; its watermarker still imports `pkg_resources`, which newer setuptools removed). Use Python 3.10–3.12. It pins its own `torch`; if that clashes with WhisperX, install it in a separate venv (`python3 -m venv .venv-voice`) and run only `voice_clone.py` from there. The first run downloads the model from Hugging Face. It runs on CUDA, Apple MPS or CPU (CPU takes a few seconds per line). Install it only when the user wants a voice fix.
+   - **Voice cloning.** VoxCPM2 (Apache-2.0): `pip install voxcpm soundfile` in its own venv (`_shared/envs/voxcpm`), with Python 3.10–3.12; its `torch` can clash with WhisperX's, so keep the two environments apart. The first run downloads the model (about 4 GB) from Hugging Face. It runs on CUDA, Apple MPS or CPU. Install it only when the user wants a voice fix or narration.
 
 If a model download is blocked (sandboxed or offline machine), switch to runtime profile 2.
 
@@ -278,12 +276,11 @@ Field notes:
 
 ## Voice cloning (optional)
 
-`scripts/voice_clone.py` generates Spanish speech in the speaker's own voice, zero-shot from about 10 s of their speech. Pick the engine with `voice.engine` (or the user config):
+`scripts/voice_clone.py` generates Spanish speech in the speaker's own voice, zero-shot from about 10 s of their speech, with VoxCPM2 (`voice.engine`: `voxcpm`):
 
 | Engine | Where it runs | Notes |
 |---|---|---|
-| `voxcpm` (default) | local, VoxCPM2, Apache-2.0, 48 kHz | Best Spain-Spanish accent and naturalness in our blind test. Needs the reference transcript (`ref.txt` next to `ref_file`, or taken from the transcript for a `ref` span). `pip install voxcpm soundfile`. |
-| `chatterbox` | local, MIT | Lighter, but tends towards a Latin American accent. |
+| `voxcpm` | local, VoxCPM2, Apache-2.0, 48 kHz | Won a blind test against Qwen3-TTS and Chatterbox on accent fidelity (it keeps a Spain-Spanish accent) and naturalness. Needs the reference transcript (`ref.txt` next to `ref_file`, or taken from the transcript for a `ref` span). `pip install voxcpm soundfile`. |
 | `elevenlabs` | ElevenLabs API, paid | **Disabled for now** (do not offer it). The code stays in `voice_clone.py` (`DISABLED_ENGINES`) for when it is enabled again. |
 
 Run `voice_clone.py` with the Python environment of the chosen engine (`_shared/envs/<engine>`). It has two uses, and nothing else:
@@ -294,14 +291,14 @@ Rules:
 1. **Consent first.** Clone only the voice of the person in the video, and only when the user confirms it is their own voice or that they have that person's permission. Ask explicitly before the first use. Record it as `"voice": {"consent": true}` in `edit.json` and in `speakers.<id>.consent` of the user config; the script refuses to run without it. Never clone a voice from any other recording.
 2. **Lip sync.** A patch changes the sound but not the mouth. Use it for one to four words, ideally where the change is hard to see (similar mouth shapes, a zoom, an animation or B-roll covering the face). For longer changes, prefer cutting or a re-recording, and say so.
 3. **Keep the text short and natural.** Write it the way the speaker talks, with the same register. Write numbers as words ("veinticinco por ciento"). A patch must be about as long as the words it replaces. If the script says the clip is too long, shorten the text or widen the word range.
-4. **Listen before using.** After each run, play `work/voice/<id>.wav` (or have the user play it) and check the pronunciation, especially names and anglicisms. Transcribe the clips back with Whisper and compare them with the text: a changed word ("hacer" for "nacer") is a mispronunciation. If a clip sounds wrong, give that line its own `"seed"` (re-rolls only that take), rephrase it, or adjust `exaggeration` (chatterbox: 0.3 for calm, 0.7 for energetic), then re-run. Unchanged lines are not regenerated.
+4. **Listen before using.** After each run, play `work/voice/<id>.wav` (or have the user play it) and check the pronunciation, especially names and anglicisms. Transcribe the clips back with Whisper and compare them with the text: a changed word ("hacer" for "nacer") is a mispronunciation. If a clip sounds wrong, give that line its own `"seed"` (re-rolls only that take) or rephrase it, then re-run. Unchanged lines are not regenerated.
 5. **Reference.** Never run a denoiser on a reference: the model clones its artifacts as a metallic, robotic timbre. By default the script picks the best 8–15 s of continuous, clean speech that is not cut or patched. If that stretch has music, noise or another voice, set `voice.ref` to `[start, end]` in source seconds.
 6. **No dubbing or translation.** This skill does not translate or re-voice whole videos.
 7. **Narrated scenes.** When the voice-over says new things (not a fix), show the script to the user at Checkpoint 1 and get it approved before generating. Adapt source material to the speaker's register and to social media: short sentences, second person, one idea per line, and a closing CTA. Never invent claims that are not in the source.
 
 `edit.json` example:
 ```json
-{"voice": {"consent": true, "ref": null, "exaggeration": 0.5, "cfg_weight": 0.5, "seed": 7},
+{"voice": {"consent": true, "ref": null, "engine": "voxcpm", "steps": 25, "seed": 7},
  "voice_patches": [{"id": "p1", "words": [120, 122], "text": "el veinticinco por ciento"}]}
 ```
 Ids are shared by patches and voice-overs, so they must be unique across both files. The clips go to `work/voice/`.
@@ -441,9 +438,9 @@ All four keep at least 3:1 WCAG contrast for every role on `fondo`, and at least
 | Captions use the wrong font | the font file is missing from `work/fonts/`, or `style.font` doesn't match its family name (`fc-scan file.ttf`) |
 | Zoom crops the face | set `zoom_center` manually to `[x, y]` (normalized face position) |
 | Audio pumps or sounds robotic | `"denoise": "off"` (the default `auto` only denoises when the pauses are noisy, above -50 dBFS) |
-| Cloned voice doesn't sound like the speaker | set `voice.ref` to a cleaner 10–15 s stretch; lower `exaggeration` |
+| Cloned voice doesn't sound like the speaker | set `voice.ref` (or `ref_file`) to a cleaner 10–15 s stretch whose `ref.txt` matches it exactly |
 | Cloned voice sounds robotic or metallic | the reference was denoised (rebuild it with only `highpass=f=60`); with `voxcpm`, raise `voice.steps` to 25–30 |
-| Cloned voice is rushed or flat | lower `cfg_weight` (0.3) for a slower delivery; raise `exaggeration` for energy |
+| Cloned voice is rushed, flat or odd | re-roll that line with its own `"seed"`; adjust `cfg_value` (1.5 looser, 2.5 more literal); pick a reference with the delivery you want, since the voice copies its energy and pace |
 | `filter_complex_script` not recognized | FFmpeg 8+ removed it; the scripts detect the version, so recopy `scripts/` from the skill |
 
 ## Roadmap hooks (don't build unless asked)

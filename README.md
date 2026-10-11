@@ -13,7 +13,7 @@
 - **Animaciones programadas**: el agente escribe cada animación en Python y se superpone con transparencia. Pueden ser tarjetas, contadores, sellos, barras de progreso o escenas 2D a pantalla completa.
 - **Guía de estilo**: 4 estilos de animación y 4 paletas de 5 colores con contraste verificado, o colores propios en HEX.
 - **Control de ritmo**: un validador bloquea las líneas de tiempo sobrecargadas.
-- **Clonación de voz** (opcional): corrige una palabra o frase mal dicha, o añade una voz en off corta, con la voz de quien habla (Chatterbox Multilingual, MIT). Solo con consentimiento explícito y sin doblaje.
+- **Clonación de voz** (opcional): corrige una palabra o frase mal dicha, o añade una voz en off corta, con la voz de quien habla (VoxCPM2, Apache-2.0, en local). Solo con consentimiento explícito y sin doblaje.
 - **Extras**: propuesta de título, descripción, hashtags y miniaturas.
 
 ### Cómo trabaja
@@ -38,7 +38,7 @@ social-video-editor/          ← el skill (lo que se instala)
 ├── SKILL.md                  ← procedimiento para el agente
 ├── scripts/                  ← pipeline determinista (Python + FFmpeg)
 │   ├── transcribe.py  build_edit.py  captions.py  render.py
-│   └── anim_kit.py  sfx_synth.py  voice_clone.py  align_voice.py  common.py
+│   └── anim_kit.py  sfx_synth.py  voice_clone.py  align_voice.py  check_update.py  common.py
 ├── references/PRD.md         ← producto: objetivos, requisitos, roadmap
 └── agents/openai.yaml        ← metadatos opcionales para ChatGPT / Codex
 .claude/skills/social-video-editor  → enlace para Claude Code
@@ -55,6 +55,10 @@ social-video-editor/          ← el skill (lo que se instala)
 | **ChatGPT** | Sube el mismo `.zip` desde el selector de Skills. `agents/openai.yaml` aporta el nombre, la descripción y el prompt por defecto. |
 
 Después, sube tu vídeo y pide algo como *"edita este vídeo para redes"*, o invoca el skill por su nombre (`/social-video-editor` en Claude Code).
+
+## Versiones
+
+`social-video-editor/VERSION` guarda la versión del skill (`MAJOR.MINOR.PATCH`). Al empezar, el skill la compara con la publicada en `main` (`scripts/check_update.py`) y avisa si hay una nueva. **Cada cambio en el skill debe subir la versión** en el mismo PR: `PATCH` para correcciones, `MINOR` para funciones nuevas y `MAJOR` si cambian los formatos de `edit.json` o `timeline.json`.
 
 ## Carpeta de proyectos
 
@@ -78,7 +82,7 @@ La carpeta está en `.gitignore`: los vídeos y los pesos de los modelos nunca s
 - Opcional:
   - token de Hugging Face (detección de hablantes);
   - DeepFilterNet (mejor reducción de ruido);
-  - `chatterbox-tts` y `setuptools<80` (clonación de voz, Python 3.10–3.12; si choca con WhisperX, en un entorno virtual aparte);
+  - `voxcpm` y `soundfile` (clonación de voz, Python 3.10–3.12, en un entorno virtual aparte del de WhisperX);
   - Montserrat ExtraBold en `work/fonts/`.
 
 La GPU es opcional: en CPU funciona con int8, aunque más despacio.

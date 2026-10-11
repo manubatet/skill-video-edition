@@ -15,21 +15,22 @@
       "sfx",
       "animations"
     ],
-    "anim_style": "flat2d",
-    "palette": "calma",
-    "font": "Arial Rounded MT Bold",
+    "anim_style": "bold",
+    "palette": "energia",
+    "font": "Montserrat",
     "loudness": -14
   },
   "glossary": [
-    "Nombre Apellido",
-    "Marca"
+    "Lucía Ferrer",
+    "NutriFit",
+    "batch cooking"
   ],
   "speakers": {
-    "nombre-apellido": {
-      "name": "Nombre Apellido",
-      "title": "Cargo o profesión",
-      "voice_ref": "Projects/_shared/voices/nombre-apellido/ref.wav",
-      "consent": "AAAA-MM-DD: quién dio permiso y para qué uso"
+    "lucia-ferrer": {
+      "name": "Lucía Ferrer",
+      "title": "Nutricionista deportiva",
+      "voice_ref": "Projects/_shared/voices/lucia-ferrer/ref.wav",
+      "consent": "2026-01-15: Lucía autoriza clonar su voz para sus vídeos de redes (uso comercial)"
     }
   },
   "voice": {
