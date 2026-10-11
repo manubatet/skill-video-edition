@@ -64,7 +64,7 @@ video ─► transcribe.py ─► transcript.json ──(agent: retakes)──�
 | Animation rendering | Pillow and numpy | MIT-CMU, BSD |
 | SFX synthesis | numpy | BSD |
 | Optional denoising | DeepFilterNet | MIT/Apache |
-| Optional voice cloning (patches, short voice-overs) | Chatterbox Multilingual | MIT |
+| Optional voice cloning (patches, voice-overs, narrated scenes) | VoxCPM2 | Apache-2.0 |
 | Font | Montserrat | OFL |
 
 **Success metrics.**
