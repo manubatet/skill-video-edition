@@ -74,12 +74,12 @@ Read this file from the current working directory at the start of every run, bef
 | `defaults.captions`, `.effects`, `.anim_style`, `.palette`, `.font`, `.loudness` | the house style: `palette` is a preset key or `{"fondo", "texto", "principal", "secundario", "alerta"}` in HEX | intake questions 1–3, 5 and 6 |
 | `glossary` | names and brands for `--glossary` (merged with any new ones) | the glossary invite |
 | `speakers.<id>` | `name` and `title` for lower thirds, `voice_ref` (saved reference wav), `consent` (who allowed what, and when) | re-asking the name and title, picking a voice reference, and the consent question when the use matches |
-| `voice` | `engine` (`voxcpm` \| `chatterbox` \| `elevenlabs`), `api_key_env`, `elevenlabs_model` | the engine choice |
+| `voice` | `engine` (`voxcpm` \| `chatterbox`), `steps` | the engine choice |
 
 Rules:
 - **Say what you are reusing.** When the config answers intake questions, skip them, and say so in one line so the user can override, for example: "Uso tu configuración: karaoke al 64 %, flat 2D, paleta Calma, voz VoxCPM2. Dime si cambias algo."
 - **Offer to save.** At the end of a run, if the user answered questions the config doesn't cover (a new speaker, a custom palette, a projects folder), offer to save those answers. Write the file only after they agree.
-- **Never store secrets.** Credentials (ElevenLabs keys, tokens) never go in this file or in any project file. The config holds only the *name* of the environment variable (`api_key_env`). The key lives in the user's shell profile, the system keychain or a git-ignored `.env`. If the variable is missing, tell the user how to set it; never ask them to paste the key in chat.
+- **Never store secrets.** Credentials (API keys, tokens) never go in this file or in any project file. The config holds only the *name* of the environment variable (`api_key_env`). The key lives in the user's shell profile, the system keychain or a git-ignored `.env`. If the variable is missing, tell the user how to set it; never ask them to paste the key in chat.
 - The file is personal: keep it out of git (add it to `.gitignore`).
 
 ## Runtime profiles
@@ -284,7 +284,7 @@ Field notes:
 |---|---|---|
 | `voxcpm` (default) | local, VoxCPM2, Apache-2.0, 48 kHz | Best Spain-Spanish accent and naturalness in our blind test. Needs the reference transcript (`ref.txt` next to `ref_file`, or taken from the transcript for a `ref` span). `pip install voxcpm soundfile`. |
 | `chatterbox` | local, MIT | Lighter, but tends towards a Latin American accent. |
-| `elevenlabs` | ElevenLabs API, paid | Highest quality. The user needs an account whose plan includes voice cloning, and the key in the environment variable named by `api_key_env`. The voice is cloned once and its id cached in `elevenlabs.json` next to the reference. ElevenLabs clones best from 1–2 minutes of speech, so save a longer, unprocessed sample as `elevenlabs_sample.wav` next to `ref.wav` (trim the ends, `highpass=f=60`, `loudnorm=I=-20:TP=-3`, no denoiser); it is uploaded instead of the short reference. Uploading a voice to a third party needs the speaker's consent for that service too, so ask. |
+| `elevenlabs` | ElevenLabs API, paid | **Disabled for now** (do not offer it). The code stays in `voice_clone.py` (`DISABLED_ENGINES`) for when it is enabled again. |
 
 Run `voice_clone.py` with the Python environment of the chosen engine (`_shared/envs/<engine>`). It has two uses, and nothing else:
 - **Voice patch** (`edit.json` → `voice_patches`, source time): replaces the audio of a word range, for example a mispronounced name or a wrong figure. The clip is fitted to the original span: sped up by at most ×1.2, or padded with room tone if it is shorter. So no timestamp moves and the video frames stay. Then fix those words' text in `transcript.json` as usual, so the captions match.

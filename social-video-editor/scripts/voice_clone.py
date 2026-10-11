@@ -6,8 +6,8 @@ Usage (in the environment of the chosen engine):
 Engines (edit.json "voice.engine"):
   voxcpm      VoxCPM2 (Apache-2.0, local, 48 kHz). Best Spain-Spanish accent in our tests. Default.
   chatterbox  Chatterbox Multilingual (MIT, local). Lighter; tends towards a Latin American accent.
-  elevenlabs  ElevenLabs API (paid, cloud). Key from the env var in voice.api_key_env; the cloned
-              voice id is cached next to the reference (elevenlabs.json) and reused.
+  elevenlabs  ElevenLabs API (paid, cloud). DISABLED for now: load_elevenlabs is kept and tested;
+              add it back to ENGINES to enable it. Key from the env var in voice.api_key_env.
 
 Reads the lines to generate from the two decision files (the text lives there, nowhere else):
   work/edit.json      "voice": {...settings...}, "voice_patches": [{"id": "p1", "words": [120, 123], "text": "..."}]
@@ -256,7 +256,9 @@ def load_elevenlabs(device, ref, ref_text, cfg, work):
     return synth, f"ElevenLabs {cfg['elevenlabs_model']} (voice {voice_id})"
 
 
-ENGINES = {"voxcpm": load_voxcpm, "chatterbox": load_chatterbox, "elevenlabs": load_elevenlabs}
+ENGINES = {"voxcpm": load_voxcpm, "chatterbox": load_chatterbox}
+# Turned off until it is needed; enabling it is one line: ENGINES["elevenlabs"] = load_elevenlabs
+DISABLED_ENGINES = {"elevenlabs": load_elevenlabs}
 
 
 def resample(x, sr_in, sr_out):
@@ -294,6 +296,8 @@ def main():
             die(f"duplicate voice id '{ln['id']}' (ids are shared by patches and voice-overs)")
         seen.add(ln["id"])
 
+    if cfg["engine"] in DISABLED_ENGINES:
+        die(f"voice.engine '{cfg['engine']}' is disabled for now; use one of {', '.join(ENGINES)}")
     if cfg["engine"] not in ENGINES:
         die(f"voice.engine must be one of {', '.join(ENGINES)}")
     ref, ref_span, ref_text = build_ref(t, cfg, edit, work)
