@@ -62,8 +62,8 @@ Never skip a checkpoint because a tool is missing. Use the fallback instead.
 When the `social-video-editor` MCP tools are available (the Claude or ChatGPT plugin, see `plugin/README.md` in the repository), the user has already chosen the options in its settings UI. Use the tools instead of the intake and the shell:
 
 - **Settings, first, on every edit.** The settings UI replaces the *Intake* questions. Call `open_settings` with the video path as the run's first action (see *Start here*), so the user reviews this run's options (the saved values are filled in). Ask any question the request itself raises in the same turn.
-  - If the UI is shown in the chat, end your turn and wait: the user's "Guardar y editar" sends a message.
-  - If it opened in the browser (Claude Code, Codex), call `wait_for_settings` with `wait_s: 50` until it returns `confirmed`. It also returns the video path the user entered.
+  - The page opens in the user's browser. Show them its link from the `open_settings` result as a clickable link, in case it did not open.
+  - Call `wait_for_settings` with `wait_s: 50` until it returns `confirmed`. It also returns the video path the user entered.
   - Then call `get_settings` and say in one line what you are using, as in *User config*. Copy its `timeline_defaults` (the `style` and `captions` blocks) into `timeline.json` and its `edit_defaults` into `edit.json`. Respect `effects` (zooms, sfx, animations), the caption mode (`off` = no captions), the platform, the video type and the user's notes.
   - Ask in chat only what the settings don't cover (the glossary for this video, the cut plan, consent). If the user asks to change an option in chat, use `save_settings`.
 - **Setup.** `check_environment` replaces the runtime check, and `setup_project` replaces Setup steps 1–2 (it links the video and copies the scripts).
@@ -131,7 +131,7 @@ Then pick the profile that matches:
 
 The pipeline needs Python 3.9+, FFmpeg built with libass, and a machine that can download the Whisper models from Hugging Face. A GPU is optional: CPU with int8 works but is slower. On Apple Silicon, WhisperX runs on CPU.
 
-1. **Projects folder (ask once, then reuse).** If the user config has `projects_dir`, use it without asking. Otherwise ask the user where to keep their video projects. Recommend `Projects/` inside the current working directory, and accept any path they give. Explain that this folder will hold the finished videos and everything worth reusing: model weights, Python environments, voices, fonts, SFX and animations. Save the answer as `{"projects_dir": "<path>"}` in `.social-video-editor.json`. If the working directory is a git repository, add the projects folder to `.gitignore`, because media and weights never go to git. Layout:
+1. **Projects folder (ask once, then reuse).** If the user config has `projects_dir`, use it without asking. Otherwise ask the user where to keep their video projects. Recommend a folder on the Desktop, `~/Desktop/Social media videos` (the plugin's default), and accept any path they give. Explain that this folder will hold the finished videos and everything worth reusing: model weights, Python environments, voices, fonts, SFX and animations. Save the answer as `{"projects_dir": "<path>"}` in `.social-video-editor.json`. If the working directory is a git repository, add the projects folder to `.gitignore`, because media and weights never go to git. Layout:
    ```
    <projects_dir>/
    ├── _shared/                  reused by every project

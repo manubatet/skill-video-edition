@@ -5,13 +5,13 @@ El plugin convierte el skill en una app con **pantalla de ajustes**. Ahí eliges
 ```
 Claude / ChatGPT ──MCP──► plugin/server (Python, en tu ordenador) ──► scripts del skill (WhisperX, FFmpeg, Pillow)
         ▲                         │
-        └── pantalla de ajustes ◄─┘  (dentro del chat, o en http://127.0.0.1:8765)
+        └── enlace a la pantalla de ajustes ◄─┘  (página local: http://127.0.0.1:8765, en tu navegador)
 ```
 
 ## Cómo es una edición
 
 1. Pides en el chat que edite un vídeo (por ejemplo, "edita /ruta/al/vídeo.mov").
-2. **Se abre la pantalla de ajustes** con tus valores guardados y el vídeo ya puesto: dentro del chat en Claude Desktop y ChatGPT, o en tu navegador en Claude Code y Codex. Un aviso dice que el agente está esperando.
+2. **Se abre la pantalla de ajustes en tu navegador**, y el agente te deja el enlace en el chat por si no se abre sola. Trae tus valores guardados y el vídeo ya puesto. Es una página de tu ordenador: no se muestra dentro del chat, así que funciona igual en Claude Code, Claude Desktop, Codex y ChatGPT. Un aviso dice que el agente está esperando.
 3. Revisas o cambias lo que quieras para este vídeo y pulsas **Guardar y editar**. Lo que cambias queda guardado como valor por defecto para la próxima vez.
 4. El agente empieza: transcribe, propone el plan de cortes y efectos (primer punto de control), monta la vista previa (segundo punto de control) y, cuando das el visto bueno, renderiza el vídeo final en `final/`.
 
@@ -22,14 +22,14 @@ Claude / ChatGPT ──MCP──► plugin/server (Python, en tu ordenador) ─�
 - **Hugging Face**: los modelos se descargan la primera vez, en `<proyectos>/_shared/models`.
 - **Mistral**, solo si eliges *Mistral Voxtral* como motor de voz: se envían el fragmento de referencia (unos 10 s de voz) y el texto de cada frase. Con VoxCPM2 o CosyVoice 3, la voz también se genera en local.
 
-## Claves (Mistral, Hugging Face)
+## Clave de Mistral
 
 El campo de la clave de Mistral solo aparece si activas la clonación de voz y eliges *Mistral Voxtral*. Si falta la clave, la pantalla lo avisa.
 
-- **Se escriben solo en la página local** (`http://127.0.0.1:8765`, en tu navegador). Dentro del chat (Claude o ChatGPT) no hay campo para la clave: un botón abre esa página, porque lo que se escribe dentro de un chat pasa por el servidor del chat.
+- **Se escribe solo en la página local** (`http://127.0.0.1:8765`, en tu navegador), nunca en el chat: lo que se escribe en un chat pasa por los servidores del chat.
 - **Guardar, Probar y Borrar no son herramientas MCP.** El modelo no puede leer, guardar ni borrar una clave: solo ve si está configurada. La página local las llama directamente al servidor, con su token, y el servidor las rechaza si llegan por un túnel.
 - Se guardan en `~/.config/social-video-editor/secrets.json` (permisos 600), fuera de cualquier proyecto o repositorio. En Claude Desktop también puedes ponerlas en el llavero del sistema desde los ajustes de la extensión.
-- **Probar** hace una llamada de solo lectura al propio servicio (`api.mistral.ai/v1/models`, `huggingface.co/api/whoami-v2`) para comprobar que la clave funciona.
+- **Probar** hace una llamada de solo lectura al propio servicio (`api.mistral.ai/v1/models`) para comprobar que la clave funciona.
 
 ## Paleta de colores
 
@@ -46,7 +46,7 @@ claude plugin marketplace add manubatet/skill-video-edition
 claude plugin install social-video-editor@skill-video-edition
 ```
 
-Instala el skill y el servidor. Claude Code no muestra interfaces dentro del chat, así que `open_settings` abre la pantalla de ajustes en tu navegador (página local con un token, solo accesible desde tu ordenador). Los ajustes se guardan en `.social-video-editor.json` si existe en la carpeta del proyecto (el mismo archivo que usa el skill) o, si no, en `~/.config/social-video-editor/config.json`.
+Instala el skill y el servidor. `open_settings` abre la pantalla de ajustes en tu navegador (página local con un token, solo accesible desde tu ordenador). Los ajustes se guardan en `.social-video-editor.json` si existe en la carpeta del proyecto (el mismo archivo que usa el skill) o, si no, en `~/.config/social-video-editor/config.json`.
 
 ### Claude Desktop
 
@@ -54,7 +54,7 @@ Instala el skill y el servidor. Claude Code no muestra interfaces dentro del cha
 ./plugin/build.sh          # crea dist/social-video-editor.mcpb
 ```
 
-Abre `dist/social-video-editor.mcpb` con Claude Desktop (o arrástralo a *Ajustes → Extensiones*). La extensión pide la carpeta de proyectos y, opcionalmente, la clave de Mistral y el token de Hugging Face. La pantalla de ajustes completa aparece **dentro del chat** cuando pides "abre los ajustes del editor de vídeo" o empiezas una edición sin ajustes guardados.
+Abre `dist/social-video-editor.mcpb` con Claude Desktop (o arrástralo a *Ajustes → Extensiones*). La extensión pide la carpeta de proyectos y, opcionalmente, la clave de Mistral y el token de Hugging Face (solo para distinguir a varias personas que hablan). Al empezar cada edición, la pantalla de ajustes se abre en tu navegador y el agente te deja el enlace en el chat.
 
 El bundle trae el procedimiento del skill: el agente lo lee con `get_skill_guide`. Para tenerlo también como skill, sube `dist/social-video-editor-skill.zip` en *Ajustes → Capacidades → Skills*.
 
@@ -72,7 +72,7 @@ ChatGPT se conecta a servidores MCP por HTTPS, así que el servidor corre en tu 
    cloudflared tunnel --url http://127.0.0.1:8765
    ```
 3. En ChatGPT, activa el *modo desarrollador* (*Settings → Apps & Connectors → Advanced*), crea una app nueva y pega `https://<tu-túnel>/mcp/<token>`, sin autenticación. **Trata esa URL como una contraseña**: quien la tenga puede usar las herramientas.
-4. En el chat, pide "abre los ajustes del editor de vídeo". La pantalla aparece dentro de ChatGPT. Para la clave de Mistral, el botón abre la página local en tu navegador, porque lo que escribes dentro de ChatGPT pasa por sus servidores.
+4. En el chat, pide que edite un vídeo. La pantalla de ajustes se abre en el navegador de tu ordenador (el servidor corre ahí), y ChatGPT te deja el enlace.
 
 Cierra el túnel cuando termines.
 
@@ -88,7 +88,7 @@ El skill ya se detecta en `.agents/skills/`.
 
 | Herramienta | Para qué |
 |---|---|
-| `open_settings` | Muestra la pantalla de ajustes al empezar cada edición (en el chat, o en el navegador si el host no tiene interfaz) |
+| `open_settings` | Abre la pantalla de ajustes en tu navegador al empezar cada edición y devuelve su enlace |
 | `wait_for_settings` | Espera a que pulses *Guardar y editar* en la página local (Claude Code, Codex) |
 | `get_settings` | Los ajustes como resumen, más los bloques `style`/`captions` de `timeline.json` y los valores de corte de `edit.json`, listos para copiar |
 | `save_settings` | Guarda los ajustes si pides un cambio en el chat |
@@ -101,14 +101,14 @@ El skill ya se detecta en `.agents/skills/`.
 
 ## Entornos de Python
 
-Cada paso usa su entorno, igual que el skill: `<proyectos>/_shared/envs/whisperx` (transcripción, cortes y render), `envs/voxcpm` y `envs/cosyvoice` (voz). Si están en otro sitio, indica su `python` en *Proyectos → Avanzado*. Mistral no necesita entorno propio.
+Cada paso usa su entorno, igual que el skill: `<proyectos>/_shared/envs/whisperx` (transcripción, cortes y render), `envs/voxcpm` y `envs/cosyvoice` (voz). Si están en otro sitio, indica su `python` en `runtime` dentro de `.social-video-editor.json` (`python_main`, `python_whisperx`, `python_voxcpm`, `python_cosyvoice`; y `ffmpeg_dir` para FFmpeg). Mistral no necesita entorno propio.
 
 ## Desarrollo
 
 - `plugin/server/main.py`: protocolo MCP (stdio y HTTP), página local y registro de herramientas.
 - `plugin/server/tools.py`: proyectos, entornos, trabajos y archivos.
 - `plugin/server/settings.py`: ajustes, validación, claves y el resumen para el agente.
-- `plugin/ui/editor.html`: la pantalla de ajustes. Un solo archivo que funciona como MCP App (Claude), widget del Apps SDK (ChatGPT) y página local.
+- `plugin/ui/editor.html`: la pantalla de ajustes, servida como página local por el servidor.
 - `plugin/claude-desktop/manifest.json` y `plugin/build.sh`: el bundle `.mcpb`.
 - `.claude-plugin/`: manifiesto del plugin y marketplace de Claude Code.
 

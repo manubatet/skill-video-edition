@@ -30,27 +30,24 @@ import settings as cfg  # noqa: E402
 import tools  # noqa: E402
 from tools import ToolError  # noqa: E402
 
-NAME, VERSION = "social-video-editor", "1.4.0"
+NAME, VERSION = "social-video-editor", "1.5.0"
 PROTOCOLS = ("2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05")
-UI_URI = "ui://social-video-editor/settings.html"
-UI_URI_SKYBRIDGE = "ui://social-video-editor/settings-skybridge.html"
-UI_MIME = "text/html;profile=mcp-app"
 
 INSTRUCTIONS = """Edits Spanish talking-head videos for social media on the user's own machine.
 1. Start every edit with open_settings (pass the video path if you know it), before reading the video, opening
    links, checking the environment or anything else: the user reviews this run's options (captions, effects,
    style, palette, voice engine…) there instead of answering the intake questions. Ask any question the request
    itself raises (which part of the video, how long, a linked article's role…) in the same turn.
-2. If the UI is shown in the chat, end your turn: the user's "Guardar y editar" sends a message. Otherwise (it
-   opened in the browser), read get_skill_guide if the social-video-editor skill is not loaded, then call
+2. The settings page opens in the user's browser. Show them its link from the open_settings result as a
+   clickable Markdown link, read get_skill_guide if the social-video-editor skill is not loaded, then call
    wait_for_settings until it returns confirmed. Then call get_settings and say in one line what you are using.
    If the user asks to change an option in chat, use save_settings.
 3. Use these tools instead of a shell: setup_project, run_step (+ job_status for long steps),
    read_project_file / write_project_file for the decision files and animations, view_image to look at
    frames and QA sheets. Keep the skill's two checkpoints (cut plan + effects table, then the preview).
-4. Never ask the user to paste an API key in chat; keys are entered in the settings UI and never reach you."""
+4. Never ask the user to paste an API key in chat; keys are entered in the settings page and never reach you."""
 
-STATE = {"token": None, "ui_url": None, "ui_server": None, "client_ui": False, "http": False}
+STATE = {"token": None, "ui_url": None, "ui_server": None, "http": False}
 RUN = {"event": threading.Event(), "video_path": None, "pending": False, "waiting": 0}  # "Guardar y editar"
 
 
@@ -76,70 +73,62 @@ def schema(props=None, required=()):
 
 
 PROJECT = {"type": "string", "description": "project folder name (from setup_project or list_projects)"}
-UI_META = {"ui": {"resourceUri": UI_URI}, "ui/resourceUri": UI_URI, "openai/outputTemplate": UI_URI_SKYBRIDGE,
-           "openai/widgetAccessible": True, "openai/toolInvocation/invoking": "Abriendo los ajustes…",
-           "openai/toolInvocation/invoked": "Ajustes listos"}
-WIDGET_OK = {"ui": {"visibility": ["model", "app"]}, "openai/widgetAccessible": True}
 RO = {"readOnlyHint": True, "openWorldHint": False}
-APP_ONLY = {"ui": {"visibility": ["app"]}, "openai/visibility": "private", "openai/widgetAccessible": True}
 
 TOOLS = [
-    ("open_settings", "Show the settings UI (video type, captions, effects, style, palette, voice engine, Mistral "
-     "key, projects folder…). Call it first on every edit, before any other tool, so the user reviews this run's "
-     "options, and "
-     "whenever they want to see or change them. In hosts without in-chat UI it opens a local page in the "
-     "browser; then call wait_for_settings.",
+    ("open_settings", "Open the settings page (video type, captions, effects, style, palette, voice engine, "
+     "Mistral key, projects folder…) in the user's browser and return its link. Call it first on every edit, "
+     "before any other tool, so the user reviews this run's options, and whenever they want to see or change "
+     "them. Show the user the link, then call wait_for_settings.",
      schema({"video_path": {"type": "string", "description": "optional: the video the user wants to edit"},
              "open_browser": {"type": "boolean", "description": "open the local page in the user's browser"},
              "reload": {"type": "boolean", "description": "set only by the settings UI when it loads"}}),
-     UI_META, RO),
+     RO),
     ("wait_for_settings", "After open_settings opened the browser: wait until the user presses \"Guardar y "
      "editar\" in the settings page. wait_s (≤55) blocks; call again while confirmed is false. Returns the video "
-     "path the user entered.", schema({"wait_s": {"type": "number"}}), WIDGET_OK, RO),
-    ("confirm_settings", "Settings UI only: the user pressed \"Guardar y editar\" (start this run).",
-     schema({"video_path": {"type": "string"}}), APP_ONLY, {"openWorldHint": False}),
+     "path the user entered.", schema({"wait_s": {"type": "number"}}), RO),
     ("get_settings", "The user's saved choices as a brief, plus ready-to-copy timeline.json style/captions and "
-     "edit.json cut defaults. Use it instead of the intake questions.", schema(), WIDGET_OK, RO),
+     "edit.json cut defaults. Use it instead of the intake questions.", schema(), RO),
     ("save_settings", "Save the full settings object (as returned by get_settings.settings, modified). Only when "
      "the user asks to change an option in chat; the UI saves by itself.",
-     schema({"settings": {"type": "object"}}, ["settings"]), WIDGET_OK, {"openWorldHint": False}),
+     schema({"settings": {"type": "object"}}, ["settings"]), {"openWorldHint": False}),
     ("get_skill_guide", "The full editing procedure (SKILL.md): rules, JSON schemas, animation API. Read it once "
      "per conversation if the skill is not already loaded. Optionally pass a heading to get one section.",
-     schema({"section": {"type": "string"}}), WIDGET_OK, RO),
+     schema({"section": {"type": "string"}}), RO),
     ("check_environment", "Check FFmpeg (libass), the Python environments (main, WhisperX, voice engines) and "
-     "saved keys on this machine. Returns problems with fixes.", schema(), WIDGET_OK, RO),
-    ("list_projects", "Projects in the projects folder with the steps already done.", schema(), WIDGET_OK, RO),
+     "saved keys on this machine. Returns problems with fixes.", schema(), RO),
+    ("list_projects", "Projects in the projects folder with the steps already done.", schema(), RO),
     ("setup_project", "Create a project for a video on this machine: links the video (never moves it), copies "
      "the scripts and creates work/ and final/. Returns the project name to use with the other tools.",
      schema({"video_path": {"type": "string", "description": "absolute path of the source video"},
              "name": {"type": "string", "description": "optional project name"}}, ["video_path"]),
-     WIDGET_OK, {"openWorldHint": False}),
+     {"openWorldHint": False}),
     ("run_step", "Run one pipeline step locally in the background and return a job: transcribe, build_edit, "
      "voice_clone (engine from settings), align_voice, animation (needs id: renders work/anims/<id>.py), check, "
      "preview (also writes the QA sheet), final (copies to final/final.mp4), sfx. Poll with job_status.",
      schema({"project": PROJECT, "step": {"type": "string", "enum": list(tools.STEPS)},
              "id": {"type": "string", "description": "animation id for step=animation"},
              "force": {"type": "boolean", "description": "voice_clone: regenerate every line"}},
-            ["project", "step"]), WIDGET_OK, {"openWorldHint": False}),
+            ["project", "step"]), {"openWorldHint": False}),
     ("job_status", "State and log tail of a job. wait_s (≤55) blocks until it finishes or the time is up.",
-     schema({"job_id": {"type": "string"}, "wait_s": {"type": "number"}}, ["job_id"]), WIDGET_OK, RO),
+     schema({"job_id": {"type": "string"}, "wait_s": {"type": "number"}}, ["job_id"]), RO),
     ("read_project_file", "Read a text file of a project (transcript.json, transcript_edited.txt, timeline.json, "
      "logs…). Paths are relative to the project folder.",
-     schema({"project": PROJECT, "path": {"type": "string"}}, ["project", "path"]), WIDGET_OK, RO),
+     schema({"project": PROJECT, "path": {"type": "string"}}, ["project", "path"]), RO),
     ("write_project_file", "Write a decision file or an animation: work/edit.json, work/timeline.json, "
      "work/transcript.json (text fixes), work/anims/<id>.py, final/extras.md.",
      schema({"project": PROJECT, "path": {"type": "string"}, "content": {"type": "string"}},
-            ["project", "path", "content"]), WIDGET_OK, {"openWorldHint": False}),
+            ["project", "path", "content"]), {"openWorldHint": False}),
     ("view_image", "Look at an image of the project (work/qa_sheet.jpg, work/anims/<id>_sheet.png) or at one "
      "frame of a video (video = source | cut | preview | final, time_s in that video's seconds).",
      schema({"project": PROJECT, "path": {"type": "string"},
              "video": {"type": "string", "enum": ["source", "cut", "preview", "final"]},
-             "time_s": {"type": "number"}}, ["project"]), WIDGET_OK, RO),
+             "time_s": {"type": "number"}}, ["project"]), RO),
 ]
 TOOL_INDEX = {t[0]: t for t in TOOLS}
-# Keys are typed only in the local page (browser -> 127.0.0.1). These calls are not MCP tools, so a key never
-# travels through the chat host or reaches the model.
-LOCAL_ONLY = ("save_secret", "test_secret")
+# Calls only the local page (browser -> 127.0.0.1) can make. They are not MCP tools: a key never travels through
+# the chat host or reaches the model, and only the user can start a run.
+LOCAL_ONLY = ("save_secret", "test_secret", "confirm_settings")
 
 
 def text(t):
@@ -185,15 +174,11 @@ def call_tool(name, a):
             RUN["event"].clear()
             RUN.update(video_path=a.get("video_path"), pending=True)
         data = settings_payload(s, RUN["video_path"])
-        opened = False
-        if a.get("open_browser") or (a.get("open_browser") is None and not STATE["client_ui"] and not STATE["http"]):
-            opened = webbrowser.open(data["ui_url"])
-        where = "shown above" if STATE["client_ui"] else ("opened in the browser" if opened else "")
-        return result(f"Settings UI {where}. Local page (this machine only): {data['ui_url']}\n"
+        opened = a.get("open_browser", True) and webbrowser.open(data["ui_url"])
+        return result(f"Settings page{' opened in the browser' if opened else ''}. Show the user this link (it only "
+                      f"works on their computer): [Abrir los ajustes]({data['ui_url']})\n"
                       f"Current settings:\n{cfg.brief(s)}\n"
-                      + ("Wait for the user's message, then call get_settings." if STATE["client_ui"] else
-                         "Call wait_for_settings until the user presses \"Guardar y editar\", then get_settings."),
-                      data)
+                      "Call wait_for_settings until the user presses \"Guardar y editar\", then get_settings.", data)
     if name == "confirm_settings":
         RUN.update(video_path=(a.get("video_path") or "").strip() or None, pending=False)
         RUN["event"].set()
@@ -280,12 +265,6 @@ def safe_call(name, args, local=False):
 
 # ---- JSON-RPC ------------------------------------------------------------------------------
 
-def ui_html(skybridge=False):
-    html = tools.UI_FILE.read_text(encoding="utf-8")
-    return html.replace("/*SVE_BOOT*/", "window.SVE_BOOT = " + json.dumps({"mode": "skybridge" if skybridge else "app"})
-                        + ";")
-
-
 def handle(msg):
     """One JSON-RPC message in, one response (or None for notifications) out."""
     mid, method, params = msg.get("id"), msg.get("method"), msg.get("params") or {}
@@ -298,39 +277,19 @@ def handle(msg):
         return {"jsonrpc": "2.0", "id": mid, "result": r}
 
     if method == "initialize":
-        caps = params.get("capabilities") or {}
-        ext = caps.get("extensions") or (caps.get("experimental") or {})
-        STATE["client_ui"] = "io.modelcontextprotocol/ui" in ext
         want = params.get("protocolVersion")
         return ok({"protocolVersion": want if want in PROTOCOLS else PROTOCOLS[1],
-                   "capabilities": {"tools": {"listChanged": False}, "resources": {"listChanged": False},
-                                    "extensions": {"io.modelcontextprotocol/ui": {}}},
+                   "capabilities": {"tools": {"listChanged": False}},
                    "serverInfo": {"name": NAME, "title": "Social Video Editor", "version": VERSION},
                    "instructions": INSTRUCTIONS})
     if method == "ping":
         return ok({})
     if method == "tools/list":
         return ok({"tools": [{"name": n, "title": n.replace("_", " ").capitalize(), "description": d,
-                              "inputSchema": sc, "_meta": meta, "annotations": ann}
-                             for n, d, sc, meta, ann in TOOLS]})
+                              "inputSchema": sc, "annotations": ann}
+                             for n, d, sc, ann in TOOLS]})
     if method == "tools/call":
         return ok(safe_call(params.get("name"), params.get("arguments")))
-    if method == "resources/list":
-        return ok({"resources": [
-            {"uri": UI_URI, "name": "settings", "title": "Social Video Editor settings", "mimeType": UI_MIME},
-            {"uri": UI_URI_SKYBRIDGE, "name": "settings-chatgpt", "mimeType": "text/html+skybridge"}]})
-    if method == "resources/templates/list":
-        return ok({"resourceTemplates": []})
-    if method == "resources/read":
-        uri = params.get("uri")
-        if uri not in (UI_URI, UI_URI_SKYBRIDGE):
-            return {"jsonrpc": "2.0", "id": mid, "error": {"code": -32002, "message": f"unknown resource {uri}"}}
-        sky = uri == UI_URI_SKYBRIDGE
-        meta = {"ui": {"prefersBorder": True, "csp": {"connectDomains": [], "resourceDomains": []}},
-                "openai/widgetPrefersBorder": True,
-                "openai/widgetDescription": "Ajustes del editor de vídeo: subtítulos, efectos, estilo, voz."}
-        return ok({"contents": [{"uri": uri, "mimeType": "text/html+skybridge" if sky else UI_MIME,
-                                 "text": ui_html(sky), "_meta": meta}]})
     if method in ("prompts/list",):
         return ok({"prompts": []})
     if method == "logging/setLevel":

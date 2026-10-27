@@ -47,7 +47,7 @@ CHOICES = {
 LOCAL_ENGINES = ("voxcpm", "cosyvoice")
 
 DEFAULTS = {
-    "projects_dir": str(Path.home() / "Videos" / "social-video-editor"),
+    "projects_dir": str(Path.home() / "Desktop" / "Social media videos"),
     "ask": "missing",
     "update_repo": "manubatet/skill-video-edition",
     "defaults": {
@@ -268,7 +268,8 @@ def voice_settings(s):
 def public_view(s):
     """Settings as the model and the UI see them: no secret values, only whether each one is set."""
     return {"settings": s, "config_path": str(config_path()), "projects_dir": str(projects_dir(s)),
-            "secrets": secret_status(), "choices": CHOICES, "palettes": PALETTES}
+            "suggested_projects_dir": DEFAULTS["projects_dir"], "secrets": secret_status(), "choices": CHOICES,
+            "palettes": PALETTES}
 
 
 def brief(s):

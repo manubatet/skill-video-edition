@@ -22,7 +22,6 @@
 }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.45 var(--font); }
-body.embedded { background: transparent; }
 .wrap { max-width: 880px; margin: 0 auto; padding: 16px 16px 96px; }
 header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
 header h1 { font-size: 18px; margin: 0; letter-spacing: -.01em; }
@@ -129,8 +128,6 @@ footer.bar .in { max-width: 848px; width: 100%; display: flex; gap: 8px; align-i
 footer.bar .msg { flex: 1; color: var(--muted); font-size: 13px; min-width: 160px; }
 footer.bar .msg.err { color: var(--bad); }
 footer.bar .msg.good { color: var(--ok); }
-body.embedded footer.bar { position: sticky; margin: 0 -16px; }
-body.embedded .wrap { padding-bottom: 0; }
 code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; background: var(--bg); padding: 1px 5px; border-radius: 5px; }
 </style>
 </head>
@@ -207,22 +204,10 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 1
         </div>
       </div>
       <div class="palfoot"><span class="status" id="palCheck"></span><button type="button" class="btn small" id="palReset" hidden>Volver a la propuesta</button></div>
-      <div class="row" style="margin-top:8px"><label for="font">Fuente</label><input type="text" id="font" data-bind="defaults.font"></div>
-      <div class="row"><label for="loud">Volumen final</label>
-        <div class="range"><input type="range" id="loud" min="-20" max="-9" step="1" data-bind="defaults.loudness" data-type="int"><output></output></div></div>
     </section>
   </div>
 
-  <div class="panel" data-tab="cuts" data-label="Cortes y transcripción">
-    <section class="card">
-      <h2>Cortes y audio</h2><p class="sub">Se quitan repeticiones, tartamudeos y silencios. Las muletillas se quedan.</p>
-      <div class="row"><label for="max_gap">Silencio máximo</label>
-        <div class="range"><input type="range" id="max_gap" min="0.2" max="1.2" step="0.05" data-bind="defaults.cuts.max_gap" data-type="num"><output></output></div></div>
-      <div class="hint row" style="border:0;padding-top:0"><span></span><span class="hint" style="grid-column:auto;margin:0">Menos = más ritmo. 0,40 s es el punto de partida.</span></div>
-      <div class="row"><label for="pad">Margen alrededor de la voz</label>
-        <div class="range"><input type="range" id="pad" min="0.05" max="0.3" step="0.01" data-bind="defaults.cuts.pad" data-type="num"><output></output></div></div>
-      <div class="row"><label for="denoise">Reducción de ruido</label><select id="denoise" data-bind="defaults.cuts.denoise"></select></div>
-    </section>
+  <div class="panel" data-tab="cuts" data-label="Transcripción">
     <section class="card">
       <h2>Transcripción</h2><p class="sub">WhisperX en local, en español.</p>
       <div class="row"><label for="wmodel">Modelo</label><select id="wmodel" data-bind="transcribe.model"></select></div>
@@ -230,8 +215,6 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 1
         <input type="number" id="spk" min="1" max="6" style="max-width:100px" data-bind="transcribe.speakers" data-type="int"></div>
       <div class="row"><label for="glossary">Glosario</label>
         <textarea id="glossary" placeholder="Nombres, marcas y anglicismos separados por comas"></textarea></div>
-      <div class="row"><label for="key-HF_TOKEN">Token de Hugging Face</label>
-        <div class="keybox" data-keyfor="HF_TOKEN" data-ph="Opcional: para detectar quién habla"></div></div>
     </section>
   </div>
 
@@ -266,22 +249,16 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 1
   <div class="panel" data-tab="projects" data-label="Proyectos">
     <section class="card">
       <h2>Carpeta de proyectos</h2><p class="sub">Aquí se guardan los vídeos editados y todo lo reutilizable: modelos, entornos, voces y animaciones.</p>
-      <div class="row"><label for="pdir">Carpeta</label><input type="text" id="pdir" data-bind="projects_dir"></div>
+      <div class="row"><label for="pdir">Carpeta</label>
+        <div class="keybox"><div class="key"><input type="text" id="pdir" data-bind="projects_dir">
+          <button type="button" class="btn" id="pdirSuggest">Usar la sugerida</button></div>
+          <span class="hint" style="margin:0" id="pdirHint"></span></div></div>
       <div class="row"><span class="lab">Preguntas en el chat</span><div class="seg" data-seg="ask"></div></div>
       <div class="row"><span class="lab">Ajustes guardados en</span><code id="cfgPath"></code></div>
     </section>
     <section class="card">
       <h2>Proyectos</h2><p class="sub" id="projSub">Cada vídeo tiene su carpeta.</p>
       <div class="projects" id="projects"></div>
-    </section>
-    <section class="card">
-      <h2>Avanzado</h2><p class="sub">Python de cada entorno. Vacío = se detecta en <code>_shared/envs/</code>.</p>
-      <div class="row"><label for="ffdir">Carpeta de FFmpeg (con libass)</label><input type="text" id="ffdir" data-bind="runtime.ffmpeg_dir" data-type="strnull" placeholder="Se detecta sola (p. ej. ffmpeg-full de Homebrew)"></div>
-      <div class="row"><label for="py_main">Principal (FFmpeg, Pillow)</label><input type="text" id="py_main" data-bind="runtime.python_main" data-type="strnull"></div>
-      <div class="row"><label for="py_wx">WhisperX</label><input type="text" id="py_wx" data-bind="runtime.python_whisperx" data-type="strnull"></div>
-      <div class="row"><label for="py_vox">VoxCPM2</label><input type="text" id="py_vox" data-bind="runtime.python_voxcpm" data-type="strnull"></div>
-      <div class="row"><label for="py_cv">CosyVoice</label><input type="text" id="py_cv" data-bind="runtime.python_cosyvoice" data-type="strnull"></div>
-      <div class="row"><span class="lab">Comprobar</span><div class="inline"><button class="btn" id="checkEnv">Revisar el entorno</button><span class="status" id="envOut"></span></div></div>
     </section>
   </div>
 </div>
@@ -296,7 +273,7 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 1
 /*SVE_BOOT*/
 (() => {
 "use strict";
-const BOOT = window.SVE_BOOT || { mode: "app" };
+const BOOT = window.SVE_BOOT || {};
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 const LABELS = {
@@ -306,7 +283,6 @@ const LABELS = {
   mode: { karaoke: "Karaoke", word: "Palabra a palabra", sentence: "Frases" },
   position: { bottom: "Abajo", middle: "Centro", top: "Arriba" },
   effects: { zooms: "Zooms graduales", sfx: "Efectos de sonido", animations: "Animaciones" },
-  denoise: { auto: "Automática (solo si hay ruido)", off: "Desactivada", light: "Suave (FFmpeg)", deepfilter: "DeepFilterNet" },
   model: { "large-v3": "large-v3 (mejor)", medium: "medium", small: "small (borrador rápido)" },
   ask: { missing: "Solo lo que falte", always: "Todo, cada vez" },
 };
@@ -338,7 +314,6 @@ const lum = (hex) => {
 const contrast = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
 const KEYS = {
   MISTRAL_API_KEY: { test: "Probar", where: "console.mistral.ai → API Keys" },
-  HF_TOKEN: { test: "Probar", where: "huggingface.co → Settings → Access Tokens" },
 };
 const ENGINES = {
   voxcpm: ["VoxCPM2", "Local · Apache-2.0 · 48 kHz. El mejor acento de España.", "Local"],
@@ -346,79 +321,13 @@ const ENGINES = {
   mistral: ["Mistral Voxtral", "En la nube · pago por uso · sin instalar modelos.", "Nube"],
 };
 
-let S = null, DATA = null, dirty = false, hostCtx = {}, palBase = null;
+let S = null, DATA = null, dirty = false, palBase = null;
 
-/* ---------- bridges: standalone page, MCP Apps (Claude), Apps SDK (ChatGPT) ---------- */
-const bridge = (() => {
-  if (BOOT.mode === "standalone") {
-    return {
-      kind: "standalone",
-      async call(name, args) {
-        const r = await fetch("/api/call?token=" + encodeURIComponent(BOOT.token), {
-          method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, arguments: args || {} }) });
-        return r.json();
-      },
-      async boot() { return (await this.call("open_settings", { open_browser: false, reload: true })).structuredContent; },
-      message: null,
-    };
-  }
-  if (window.openai) {
-    return {
-      kind: "openai",
-      async call(name, args) { return window.openai.callTool(name, args || {}); },
-      async boot() {
-        if (window.openai.toolOutput && window.openai.toolOutput.settings) return window.openai.toolOutput;
-        return (await this.call("open_settings", { open_browser: false, reload: true })).structuredContent;
-      },
-      message(text) { return window.openai.sendFollowUpMessage({ prompt: text }); },
-      theme() { return window.openai.theme; },
-    };
-  }
-  let seq = 0; const pending = new Map(); let onResult = null;
-  const post = (m) => window.parent.postMessage(Object.assign({ jsonrpc: "2.0" }, m), "*");
-  const request = (method, params) => new Promise((res, rej) => {
-    const id = ++seq; pending.set(id, { res, rej }); post({ id, method, params });
-    setTimeout(() => { if (pending.has(id)) { pending.delete(id); rej(new Error("timeout: " + method)); } }, 120000);
-  });
-  window.addEventListener("message", (ev) => {
-    if (ev.source !== window.parent) return;
-    const m = ev.data; if (!m || m.jsonrpc !== "2.0") return;
-    if (m.id != null && pending.has(m.id) && !m.method) {
-      const p = pending.get(m.id); pending.delete(m.id);
-      m.error ? p.rej(new Error(m.error.message)) : p.res(m.result); return;
-    }
-    if (m.method === "ui/notifications/tool-result" && onResult) onResult(m.params);
-    if (m.method === "ui/notifications/host-context-changed") applyHost(m.params || {});
-    if (m.method === "ui/resource-teardown" && m.id != null) post({ id: m.id, result: {} });
-  });
-  return {
-    kind: "mcp-app",
-    call(name, args) { return request("tools/call", { name, arguments: args || {} }); },
-    async boot() {
-      const got = new Promise((res) => { onResult = (r) => res(r && r.structuredContent); });
-      try {
-        const init = await Promise.race([
-          request("ui/initialize", { protocolVersion: "2026-01-26", appInfo: { name: "social-video-editor", version: "1.4.0" }, appCapabilities: {} }),
-          new Promise((_, rej) => setTimeout(() => rej(new Error("no host")), 4000))]);
-        applyHost((init && init.hostContext) || {});
-        post({ method: "ui/notifications/initialized", params: {} });
-      } catch (e) { /* older hosts: the tool result may still arrive */ }
-      const first = await Promise.race([got, new Promise((r) => setTimeout(() => r(null), 2500))]);
-      if (first && first.settings) return first;
-      return (await this.call("open_settings", { open_browser: false, reload: true })).structuredContent;
-    },
-    message(text) { return request("ui/message", { role: "user", content: [{ type: "text", text }] }); },
-    openLink(url) { return request("ui/open-link", { url }); },
-    resize() {
-      const h = document.documentElement.scrollHeight;
-      post({ method: "ui/notifications/size-changed", params: { height: h } });
-    },
-  };
-})();
-
-function applyHost(ctx) {
-  hostCtx = Object.assign(hostCtx, ctx);
-  if (hostCtx.theme) document.documentElement.dataset.theme = hostCtx.theme;
+/* ---------- server: this page talks only to the local server (127.0.0.1) with its token ---------- */
+async function call(name, args) {
+  const r = await fetch("/api/call?token=" + encodeURIComponent(BOOT.token || ""), {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, arguments: args || {} }) });
+  return r.json();
 }
 
 /* ---------- settings helpers ---------- */
@@ -432,8 +341,6 @@ function touch() { dirty = true; msg("Cambios sin guardar"); $("#save").disabled
 function msg(t, cls) { const m = $("#msg"); m.textContent = t; m.className = "msg" + (cls ? " " + cls : ""); }
 const fmt = (el) => {
   const v = Number(el.value);
-  if (el.id === "max_gap" || el.id === "pad") return v.toFixed(2).replace(".", ",") + " s";
-  if (el.id === "loud") return v + " LUFS";
   if (el.id === "cap_size") return Math.round(v * 1000) / 10 + " %";
   return String(v).replace(".", ",");
 };
@@ -451,7 +358,6 @@ function build() {
     panels.forEach((p) => (p.hidden = p.dataset.tab !== t));
     $$("#tabs button").forEach((b) => b.setAttribute("aria-selected", b.dataset.go === t));
     try { localStorage.setItem("sve-tab", t); } catch (e) {}
-    if (bridge.resize) setTimeout(bridge.resize, 30);
   };
   $("#tabs").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) show(b.dataset.go); });
   const want = location.hash.slice(1) || saved;  // the chat's "write the key here" link opens #voice
@@ -465,7 +371,6 @@ function build() {
     seg.addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) set(path, b.dataset.v); });
   });
   option($("#video_type"), "video_type", C.video_type);
-  option($("#denoise"), "denoise", C["cuts.denoise"]);
   option($("#wmodel"), "model", C["transcribe.model"]);
 
   $$("[data-bind]").forEach((el) => {
@@ -545,36 +450,30 @@ function build() {
   }).join("");
   $("#engines").addEventListener("click", (e) => { const b = e.target.closest(".opt"); if (b) set("voice.engine", b.dataset.v); });
 
-  // Keys are typed only in the local page: what is typed inside a chat (Claude, ChatGPT) passes through the host.
+  // Keys are typed only here, never in the chat: what is typed in a chat passes through its servers.
   $$("[data-keyfor]").forEach((box) => {
     const name = box.dataset.keyfor, id = "key-" + name;
-    box.innerHTML = bridge.kind === "standalone"
-      ? `<div class="key"><input type="password" id="${id}" placeholder="${box.dataset.ph}" autocomplete="off" spellcheck="false">
+    box.innerHTML = `<div class="key"><input type="password" id="${id}" placeholder="${box.dataset.ph}" autocomplete="off" spellcheck="false">
            <button type="button" class="btn" data-act="save">Guardar</button></div>
          <div class="keyrow"><span class="status" data-status="${name}"></span>
            <button type="button" class="btn small" data-act="test">${KEYS[name].test}</button>
            <button type="button" class="btn small" data-act="clear">Borrar</button></div>
-         <span class="hint" style="margin:0">Se guarda solo en este ordenador (<code>~/.config/social-video-editor/secrets.json</code>, legible solo por tu usuario). No va al chat, ni al modelo, ni a la carpeta del proyecto. Consíguela en ${KEYS[name].where}.</span>`
-      : `<div class="keyrow"><span class="status" data-status="${name}"></span>
-           <button type="button" class="btn" data-act="local" id="${id}">Escribirla en la página local</button>
-           <button type="button" class="btn small" data-act="reload">Ya la he guardado</button></div>
-         <span class="hint" style="margin:0">Por seguridad, la clave no se escribe dentro del chat: se abre una página de tu ordenador y se guarda allí.</span>`;
+         <span class="hint" style="margin:0">Se guarda solo en este ordenador (<code>~/.config/social-video-editor/secrets.json</code>, legible solo por tu usuario). No va al chat, ni al modelo, ni a la carpeta del proyecto. Consíguela en ${KEYS[name].where}.</span>`;
     box.addEventListener("click", (e) => {
       const act = (e.target.closest("[data-act]") || {}).dataset; if (!act) return;
       if (act.act === "save") saveSecret(name, $("#" + id));
       if (act.act === "clear") saveSecret(name, null);
       if (act.act === "test") testSecret(name);
-      if (act.act === "local") openLocal();
-      if (act.act === "reload") reloadSecrets();
     });
     const input = $("#" + id);
-    if (input.tagName === "INPUT") input.addEventListener("keydown", (e) => { if (e.key === "Enter") saveSecret(name, input); });
+    input.addEventListener("keydown", (e) => { if (e.key === "Enter") saveSecret(name, input); });
   });
 
+  $("#pdir").placeholder = DATA.suggested_projects_dir || "";
+  $("#pdirSuggest").addEventListener("click", () => set("projects_dir", DATA.suggested_projects_dir));
   $("#video_path").value = DATA.video_path || "";
   $("#save").addEventListener("click", () => save(false));
   $("#go").addEventListener("click", () => save(true));
-  $("#checkEnv").addEventListener("click", checkEnv);
   $("#ver").textContent = "v" + (DATA.skill_version || "");
   $("#go").textContent = "Guardar y editar";
 }
@@ -648,12 +547,14 @@ function refresh() {
   });
   $("#mkeyMissing").hidden = !(cloud && !(DATA.secrets || {}).MISTRAL_API_KEY);
   $("#cfgPath").textContent = DATA.config_path || "";
-  if (bridge.resize) setTimeout(bridge.resize, 0);
+  const sug = DATA.suggested_projects_dir || "", here = S.projects_dir === sug;
+  $("#pdirSuggest").hidden = here || !sug;
+  $("#pdirHint").textContent = here ? "La carpeta sugerida, en tu escritorio. Se crea sola con el primer vídeo."
+    : "Sugerida: " + sug + ". Si cambias de carpeta, los modelos y entornos se vuelven a instalar en la nueva la primera vez.";
 }
 
 function paintRun() {
   $("#runNote").hidden = !DATA.run_pending;
-  if (bridge.resize) setTimeout(bridge.resize, 0);
 }
 
 function paintProjects() {
@@ -662,7 +563,7 @@ function paintProjects() {
   const steps = [["transcript", "Transcrito"], ["edit", "Cortes"], ["cut", "Montado"], ["timeline", "Efectos"], ["preview", "Vista previa"], ["final", "Final"]];
   const media = (p, w) => "/media/" + encodeURIComponent(p.name) + "/" + w + "?token=" + encodeURIComponent(BOOT.token || "");
   $("#projects").innerHTML = ps.map((p) => {
-    const vid = bridge.kind === "standalone" && (p.done.final || p.done.preview)
+    const vid = p.done.final || p.done.preview
       ? `<video controls preload="metadata" src="${media(p, p.done.final ? "final" : "preview")}"></video>` : "";
     return `<div class="proj"><div class="top"><b>${esc(p.name)}</b><span class="status">${esc(p.source || "")}</span></div>
       <div class="steps">${steps.map(([k, t]) => `<span class="${p.done[k] ? "on" : ""}">${t}</span>`).join("")}</div>${vid}</div>`;
@@ -678,7 +579,7 @@ async function save(andGo) {
   msg("Guardando…");
   try {
     if (dirty) {
-      const r = await bridge.call("save_settings", { settings: clean() });
+      const r = await call("save_settings", { settings: clean() });
       if (r.isError) throw new Error(textOf(r));
       const sc = r.structuredContent || {};
       if (sc.settings) { S = sc.settings; DATA = Object.assign(DATA, sc); }
@@ -689,10 +590,9 @@ async function save(andGo) {
     const vp = $("#video_path").value.trim();
     const order = vp ? `Edita el vídeo ${vp} con mis ajustes guardados del Social Video Editor.`
                      : "Ya he guardado mis ajustes del Social Video Editor. Vamos a editar un vídeo.";
-    const c = await bridge.call("confirm_settings", { video_path: vp });  // wakes wait_for_settings
+    const c = await call("confirm_settings", { video_path: vp });  // wakes wait_for_settings
     DATA.run_pending = false; paintRun();
-    if (bridge.message) { await bridge.message(order); msg("Enviado al chat", "good"); }
-    else if ((c.structuredContent || {}).agent_waiting) msg("Listo: Claude empieza a editar con estas opciones. Vuelve al chat.", "good");
+    if ((c.structuredContent || {}).agent_waiting) msg("Listo: Claude empieza a editar con estas opciones. Vuelve al chat.", "good");
     else {
       try { await navigator.clipboard.writeText(order); msg("Guardado. Orden copiada: pégala en el chat.", "good"); }
       catch (e) { msg("Guardado. Escribe en el chat: " + order, "good"); }
@@ -706,7 +606,7 @@ async function saveSecret(name, input) {
   if (input && !value) return msg("Pega la clave antes de guardar", "err");
   msg(input ? "Guardando la clave…" : "Borrando la clave…");
   try {
-    const r = await bridge.call("save_secret", { name, value });
+    const r = await call("save_secret", { name, value });
     if (r.isError) throw new Error(textOf(r).replace(/^Error: /, ""));
     DATA.secrets = (r.structuredContent || {}).secrets || DATA.secrets;
     if (input) input.value = "";
@@ -719,47 +619,23 @@ async function saveSecret(name, input) {
 async function testSecret(name) {
   msg("Probando la clave…");
   try {
-    const r = await bridge.call("test_secret", { name });
+    const r = await call("test_secret", { name });
     const ok = (r.structuredContent || {}).ok;
     msg((ok ? "La clave " : "La clave no funciona: ") + textOf(r), ok ? "good" : "err");
   } catch (e) { msg("No se pudo probar la clave: " + e.message, "err"); }
 }
 
-async function reloadSecrets() {
-  const r = await bridge.call("get_settings", {});
-  DATA.secrets = (r.structuredContent || {}).secrets || DATA.secrets;
-  refresh();
-  msg((DATA.secrets || {}).MISTRAL_API_KEY ? "Clave de Mistral detectada" : "Todavía no hay clave guardada", "good");
-}
-
-async function checkEnv() {
-  $("#envOut").textContent = "Revisando…";
-  const r = await bridge.call("check_environment", {});
-  const sc = r.structuredContent || {};
-  $("#envOut").textContent = sc.ready ? "Todo listo" : (sc.problems || [textOf(r)]).join(" · ");
-  $("#envOut").className = "status" + (sc.ready ? " set" : "");
-}
-
-function openLocal() {
-  const url = DATA.ui_url + "#voice";
-  if (window.openai && window.openai.openExternal) window.openai.openExternal({ href: url });
-  else if (bridge.openLink) bridge.openLink(url).catch(() => window.open(url, "_blank", "noopener"));
-  else window.open(url, "_blank", "noopener");
-}
-
 const textOf = (r) => ((r && r.content) || []).map((c) => c.text || "").join(" ");
 
 /* ---------- start ---------- */
-document.body.classList.toggle("embedded", bridge.kind !== "standalone");
-if (bridge.theme && bridge.theme()) applyHost({ theme: bridge.theme() });
-window.addEventListener("openai:set_globals", () => bridge.theme && applyHost({ theme: bridge.theme() }));
-bridge.boot().then((data) => {
-  if (!data || !data.settings) throw new Error("sin datos del servidor");
+call("open_settings", { open_browser: false, reload: true }).then((r) => {
+  const data = r.structuredContent;
+  if (!data || !data.settings) throw new Error(textOf(r) || "sin datos del servidor");
   DATA = data; S = data.settings;
   build(); refresh(); paintProjects(); paintRun();
-  msg(bridge.kind === "standalone" ? "Página local: solo se ve en este ordenador" : "Listo");
+  msg("Página local: solo se ve en este ordenador");
   $("#go").disabled = false;
-  window.addEventListener("beforeunload", (e) => { if (dirty && bridge.kind === "standalone") { e.preventDefault(); e.returnValue = ""; } });
+  window.addEventListener("beforeunload", (e) => { if (dirty) { e.preventDefault(); e.returnValue = ""; } });
 }).catch((e) => msg("No se pudo cargar: " + e.message, "err"));
 })();
 </script>
