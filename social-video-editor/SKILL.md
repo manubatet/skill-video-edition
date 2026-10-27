@@ -174,7 +174,7 @@ Ask this round when captions or animations are on. Skip it only when both are of
    - **Minimal limpio**: líneas finas, fundidos y deslizamientos suaves, sin rebote.
    - **Flat 2D ilustrado**: iconos y personajes simples de colores planos.
    - **Neón tech**: fondo oscuro, bordes brillantes, entradas rápidas.
-6. **Color palette (style guide)**: single choice. Offer the four presets from *Color palette presets*. Put the five HEX codes in each option's `description`, so the user sees the actual colours. Put the preset that best fits the video's topic first as "(Recommended)". The question text must explain the "Other" format, for example: "¿Qué paleta de colores usamos? Si tienes la tuya, escribe en 'Other' hasta 5 colores HEX en este orden: fondo, texto, principal, secundario, alerta (p. ej. #1E3A4C, #F7F5F0, #5EC2B7, #F4A261, #E76F51)."
+6. **Color palette (style guide)**: single choice. Offer the four presets from *Color palette presets* that best fit the video's topic (AskUserQuestion takes at most 4 options). Put the five HEX codes in each option's `description`, so the user sees the actual colours. Put the preset that best fits the video's topic first as "(Recommended)". The question text must explain the "Other" format, for example: "¿Qué paleta de colores usamos? Si tienes la tuya, escribe en 'Other' hasta 5 colores HEX en este orden: fondo, texto, principal, secundario, alerta (p. ej. #1E3A4C, #F7F5F0, #5EC2B7, #F4A261, #E76F51)."
 
 Custom answers:
 - **Custom style:** a free-text style becomes `style.anim_style`, holding the user's description. Derive its motion and shape rules from the nearest preset and state them at Checkpoint 1.
@@ -429,8 +429,11 @@ Also set `style.palette` to the preset's key, or to `"custom"`.
 | `calma` | Calma (salud) | `#1E3A4C` | `#F7F5F0` | `#5EC2B7` | `#F4A261` | `#E76F51` | salud, psicología, bienestar, educación |
 | `pop` | Pop (rosa y violeta) | `#1A1033` | `#FFFFFF` | `#FF4FA3` | `#7C5CFF` | `#FFD23F` | lifestyle, moda, belleza, entretenimiento |
 | `tierra` | Tierra (elegante) | `#2B2622` | `#FAF6F0` | `#D9B26F` | `#8DB38B` | `#C4553A` | gastronomía, viajes, marca personal premium |
+| `oceano` | Océano (corporativo) | `#0B2545` | `#F4F7FB` | `#4CC9F0` | `#FFB703` | `#FF5D73` | empresa, finanzas, tecnología |
+| `noche` | Noche (tech) | `#0D0D14` | `#F2F2F7` | `#00E5FF` | `#C77DFF` | `#FF2E63` | tech, gaming, IA |
+| `bosque` | Bosque (natural) | `#16261D` | `#F3F1E7` | `#9BD770` | `#F2C14E` | `#E4572E` | sostenibilidad, deporte, naturaleza |
 
-All four keep at least 3:1 WCAG contrast for every role on `fondo`, and at least 4.5:1 for texto and principal. With a custom palette:
+All presets keep at least 3:1 WCAG contrast for every role on `fondo`, and at least 4.5:1 for texto and principal. With a custom palette:
 - Check the same contrasts.
 - If principal on fondo is below 3:1, use texto as `accent_text` instead of fondo, and tell the user.
 - If texto on fondo is below 4.5:1, warn the user and propose the nearest fix.

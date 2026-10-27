@@ -74,7 +74,6 @@ PROJECT = {"type": "string", "description": "project folder name (from setup_pro
 UI_META = {"ui": {"resourceUri": UI_URI}, "ui/resourceUri": UI_URI, "openai/outputTemplate": UI_URI_SKYBRIDGE,
            "openai/widgetAccessible": True, "openai/toolInvocation/invoking": "Abriendo los ajustes…",
            "openai/toolInvocation/invoked": "Ajustes listos"}
-APP_ONLY = {"ui": {"visibility": ["app"]}, "openai/visibility": "private", "openai/widgetAccessible": True}
 WIDGET_OK = {"ui": {"visibility": ["model", "app"]}, "openai/widgetAccessible": True}
 RO = {"readOnlyHint": True, "openWorldHint": False}
 
@@ -90,9 +89,6 @@ TOOLS = [
     ("save_settings", "Save the full settings object (as returned by get_settings.settings, modified). Only when "
      "the user asks to change an option in chat; the UI saves by itself.",
      schema({"settings": {"type": "object"}}, ["settings"]), WIDGET_OK, {"openWorldHint": False}),
-    ("save_secret", "Store an API key locally (settings UI only).",
-     schema({"name": {"type": "string", "enum": list(cfg.SECRET_NAMES)}, "value": {"type": "string"}},
-            ["name", "value"]), APP_ONLY, {"openWorldHint": False}),
     ("get_skill_guide", "The full editing procedure (SKILL.md): rules, JSON schemas, animation API. Read it once "
      "per conversation if the skill is not already loaded. Optionally pass a heading to get one section.",
      schema({"section": {"type": "string"}}), WIDGET_OK, RO),
@@ -127,6 +123,9 @@ TOOLS = [
              "time_s": {"type": "number"}}, ["project"]), WIDGET_OK, RO),
 ]
 TOOL_INDEX = {t[0]: t for t in TOOLS}
+# Keys are typed only in the local page (browser -> 127.0.0.1). These calls are not MCP tools, so a key never
+# travels through the chat host or reaches the model.
+LOCAL_ONLY = ("save_secret", "test_secret")
 
 
 def text(t):
@@ -186,8 +185,12 @@ def call_tool(name, a):
         saved, path = cfg.save_settings(a["settings"])
         return result(f"Saved to {path}.\n{cfg.brief(saved)}", settings_payload(saved))
     if name == "save_secret":
-        cfg.set_secret(a["name"], a["value"])
-        return result(f"{a['name']} {'saved' if a['value'].strip() else 'removed'}.", {"secrets": cfg.secret_status()})
+        cfg.set_secret(a["name"], a.get("value", ""))
+        saved = bool(a.get("value", "").strip())
+        return result(f"{a['name']} {'saved' if saved else 'removed'}.", {"secrets": cfg.secret_status()})
+    if name == "test_secret":
+        good, why = cfg.test_secret(a["name"])
+        return result(why, {"ok": good, "secrets": cfg.secret_status()})
     if name == "get_skill_guide":
         md = (tools.skill_dir() / "SKILL.md").read_text(encoding="utf-8")
         if a.get("section"):
@@ -229,8 +232,8 @@ def _job_text(st):
     return head + "\n" + st["tail"][-3000:]
 
 
-def safe_call(name, args):
-    if name not in TOOL_INDEX:
+def safe_call(name, args, local=False):
+    if name not in TOOL_INDEX and not (local and name in LOCAL_ONLY):
         return {"content": [text(f"unknown tool {name}")], "isError": True}
     try:
         return call_tool(name, args or {})
@@ -406,8 +409,14 @@ class Handler(BaseHTTPRequestHandler):
                 req = json.loads(body)
             except json.JSONDecodeError:
                 return self._json(400, {"error": "bad json"})
-            return self._json(200, safe_call(req.get("name"), req.get("arguments")))
+            return self._json(200, safe_call(req.get("name"), req.get("arguments"), local=self._direct()))
         self._send(404, b"not found", "text/plain")
+
+    def _direct(self):
+        """True for a browser on this machine; False through a tunnel (ChatGPT mode), which adds proxy headers."""
+        host = self.headers.get("Host", "").rsplit(":", 1)[0]
+        proxied = any(self.headers.get(h) for h in ("X-Forwarded-For", "Forwarded", "Cf-Connecting-Ip", "X-Real-Ip"))
+        return host in ("127.0.0.1", "localhost") and not proxied
 
     def _origin(self):
         return f"http://{self.headers.get('Host', '')}"

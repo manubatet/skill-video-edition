@@ -79,10 +79,32 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 .opt .tag { float: right; font-size: 11px; padding: 1px 7px; border-radius: 999px; background: var(--card); border: 1px solid var(--line); }
 .sw { display: flex; gap: 3px; margin-top: 8px; }
 .sw i { flex: 1; height: 18px; border-radius: 4px; border: 1px solid rgba(0,0,0,.08); }
-.colors { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-top: 10px; }
-.colors label { font-size: 12px; color: var(--muted); display: grid; gap: 4px; }
-.colors input[type=color] { width: 100%; height: 34px; border: 1px solid var(--line); border-radius: 8px; background: none; padding: 2px; }
-@media (max-width: 560px) { .colors { grid-template-columns: repeat(3, 1fr); } }
+.paledit { display: grid; grid-template-columns: 1fr 190px; gap: 14px; margin-top: 12px; align-items: start; }
+@media (max-width: 560px) { .paledit { grid-template-columns: 1fr; } }
+.colors { display: grid; gap: 6px; }
+.colors .c { display: grid; grid-template-columns: 40px 96px 1fr; gap: 10px; align-items: center; }
+.colors input[type=color] { width: 40px; height: 34px; border: 1px solid var(--line); border-radius: 8px; background: none; padding: 2px; cursor: pointer; }
+.colors input.hex { font-family: ui-monospace, Menlo, monospace; text-transform: uppercase; padding: 7px 8px; }
+.colors input.hex.bad { border-color: var(--bad); }
+.colors .c span b { display: block; font-size: 13px; }
+.colors .c span small { color: var(--muted); font-size: 12px; }
+.palfoot { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
+.palfoot .status { flex: 1; min-width: 180px; }
+.status.warn { color: var(--warn); }
+.mock { aspect-ratio: 9 / 14; border-radius: 12px; position: relative; overflow: hidden; border: 1px solid var(--line);
+  background: linear-gradient(160deg, #6d7a86, #2f3a44 55%, #1b2228); }
+.mock .face { position: absolute; left: 50%; top: 22%; width: 42%; aspect-ratio: 1; transform: translateX(-50%); border-radius: 50%;
+  background: radial-gradient(circle at 50% 40%, #d8b9a0, #a88470); opacity: .85; }
+.mock .card { position: absolute; left: 10%; right: 10%; top: 8%; border-radius: 8px; padding: 6px 8px; font-size: 11px; font-weight: 700; display: flex; gap: 6px; align-items: center; }
+.mock .card i { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.mock .badge { position: absolute; right: 8%; top: 52%; font-size: 10px; font-weight: 800; padding: 2px 7px; border-radius: 999px; }
+.mock .cap { position: absolute; left: 6%; right: 6%; bottom: 12%; text-align: center; font: 900 17px/1.1 var(--font); text-transform: uppercase;
+  -webkit-text-stroke: 3px #000; paint-order: stroke fill; }
+.keybox { display: grid; gap: 6px; }
+.keyrow { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.keyrow .status { flex: 1; }
+button.btn.small { padding: 4px 10px; font-size: 12px; }
+.note.warn { border: 1px solid var(--bad); background: transparent; }
 .note { border-radius: 10px; padding: 10px 12px; background: var(--soft); font-size: 13px; margin-top: 10px; }
 .note.cloud { border: 1px solid var(--warn); background: transparent; }
 .key { display: flex; gap: 8px; }
@@ -172,9 +194,18 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 1
         <input type="text" id="anim_custom" placeholder="Describe tu estilo (referencias, cuentas que te gusten…)"></div>
     </section>
     <section class="card">
-      <h2>Paleta de colores</h2><p class="sub">Cinco colores: fondo, texto, principal, secundario y alerta.</p>
+      <h2>Paleta de colores</h2><p class="sub">Elige una propuesta y ajusta cualquiera de sus cinco colores: haz clic en la muestra o escribe el código HEX.</p>
       <div class="cards" id="palettes"></div>
-      <div class="colors" id="customColors" hidden></div>
+      <div class="paledit">
+        <div class="colors" id="customColors"></div>
+        <div class="mock" id="mock" aria-label="Vista previa de la paleta">
+          <div class="face"></div>
+          <div class="card" id="mockCard"><i></i>3 claves para empezar</div>
+          <div class="badge" id="mockBadge">ERROR</div>
+          <div class="cap" id="mockCap">Esto es <span>clave</span></div>
+        </div>
+      </div>
+      <div class="palfoot"><span class="status" id="palCheck"></span><button type="button" class="btn small" id="palReset" hidden>Volver a la propuesta</button></div>
       <div class="row" style="margin-top:8px"><label for="font">Fuente</label><input type="text" id="font" data-bind="defaults.font"></div>
       <div class="row"><label for="loud">Volumen final</label>
         <div class="range"><input type="range" id="loud" min="-20" max="-9" step="1" data-bind="defaults.loudness" data-type="int"><output></output></div></div>
@@ -198,9 +229,8 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 1
         <input type="number" id="spk" min="1" max="6" style="max-width:100px" data-bind="transcribe.speakers" data-type="int"></div>
       <div class="row"><label for="glossary">Glosario</label>
         <textarea id="glossary" placeholder="Nombres, marcas y anglicismos separados por comas"></textarea></div>
-      <div class="row"><label for="hf">Token de Hugging Face</label>
-        <div><div class="key"><input type="password" id="hf" placeholder="Opcional: para detectar quién habla" autocomplete="off"><button class="btn" data-secret="HF_TOKEN" data-input="hf">Guardar</button></div>
-        <div class="status" data-status="HF_TOKEN"></div></div></div>
+      <div class="row"><label for="key-HF_TOKEN">Token de Hugging Face</label>
+        <div class="keybox" data-keyfor="HF_TOKEN" data-ph="Opcional: para detectar quién habla"></div></div>
     </section>
   </div>
 
@@ -223,9 +253,9 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 1
         </div>
         <div id="eng-mistral" class="engopts">
           <div class="note cloud"><b>Esto sale de tu ordenador.</b> Con Mistral solo se envían a api.mistral.ai el fragmento de referencia (unos 10 s de voz) y el texto de cada frase. El vídeo se sigue editando aquí. Es de pago por uso.</div>
-          <div class="row"><label for="mkey">API key de Mistral</label>
-            <div><div class="key" id="mkeyBox"><input type="password" id="mkey" placeholder="Pega aquí tu clave" autocomplete="off"><button class="btn" data-secret="MISTRAL_API_KEY" data-input="mkey">Guardar</button></div>
-            <div class="status" data-status="MISTRAL_API_KEY"></div></div></div>
+          <div class="note warn" id="mkeyMissing" hidden><b>Falta la clave de Mistral.</b> Sin ella no se puede generar la voz. Créala en console.mistral.ai → API Keys.</div>
+          <div class="row"><label for="key-MISTRAL_API_KEY">API key de Mistral</label>
+            <div class="keybox" data-keyfor="MISTRAL_API_KEY" data-ph="Pega aquí tu clave"></div></div>
           <div class="row"><label for="mmodel">Modelo</label><input type="text" id="mmodel" data-bind="voice.mistral_model"></div>
         </div>
       </div>
@@ -285,15 +315,37 @@ const ANIM = {
   flat2d: ["Flat 2D ilustrado", "Iconos y personajes de colores planos."],
   neon: ["Neón tech", "Fondo oscuro, bordes brillantes, entradas rápidas."],
 };
-const PAL = { energia: "Energía", calma: "Calma", pop: "Pop", tierra: "Tierra" };
+const PAL = { energia: ["Energía", "Tips, motivación, negocio"], calma: ["Calma", "Salud, bienestar, educación"],
+  pop: ["Pop", "Lifestyle, moda, belleza"], tierra: ["Tierra", "Gastronomía, viajes, marca premium"],
+  oceano: ["Océano", "Empresa, finanzas, tecnología"], noche: ["Noche", "Tech, gaming, IA"],
+  bosque: ["Bosque", "Sostenibilidad, deporte, naturaleza"] };
 const ROLES = ["fondo", "texto", "principal", "secundario", "alerta"];
+const ROLE_USE = { fondo: "Paneles y tarjetas", texto: "Subtítulos y textos", principal: "Palabra destacada y acentos",
+  secundario: "Segundo énfasis", alerta: "Avisos y errores" };
+const MIN_CONTRAST = { texto: 4.5, principal: 4.5, secundario: 3, alerta: 3 };  // on fondo (SKILL.md)
+const normHex = (v) => {
+  const m = String(v || "").trim().replace(/^#/, "").match(/^([0-9a-f]{3}|[0-9a-f]{6})$/i);
+  if (!m) return null;
+  const h = m[1].length === 3 ? m[1].split("").map((c) => c + c).join("") : m[1];
+  return "#" + h.toUpperCase();
+};
+const lum = (hex) => {
+  const c = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)
+    .map((x) => (x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4));
+  return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+};
+const contrast = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
+const KEYS = {
+  MISTRAL_API_KEY: { test: "Probar", where: "console.mistral.ai → API Keys" },
+  HF_TOKEN: { test: "Probar", where: "huggingface.co → Settings → Access Tokens" },
+};
 const ENGINES = {
   voxcpm: ["VoxCPM2", "Local · Apache-2.0 · 48 kHz. El mejor acento de España.", "Local"],
   cosyvoice: ["CosyVoice 3", "Local · más ligero, prosodia muy natural.", "Local"],
   mistral: ["Mistral Voxtral", "En la nube · pago por uso · sin instalar modelos.", "Nube"],
 };
 
-let S = null, DATA = null, dirty = false, hostCtx = {};
+let S = null, DATA = null, dirty = false, hostCtx = {}, palBase = null;
 
 /* ---------- bridges: standalone page, MCP Apps (Claude), Apps SDK (ChatGPT) ---------- */
 const bridge = (() => {
@@ -355,6 +407,7 @@ const bridge = (() => {
       return (await this.call("open_settings", { open_browser: false })).structuredContent;
     },
     message(text) { return request("ui/message", { role: "user", content: [{ type: "text", text }] }); },
+    openLink(url) { return request("ui/open-link", { url }); },
     resize() {
       const h = document.documentElement.scrollHeight;
       post({ method: "ui/notifications/size-changed", params: { height: h } });
@@ -400,7 +453,8 @@ function build() {
     if (bridge.resize) setTimeout(bridge.resize, 30);
   };
   $("#tabs").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) show(b.dataset.go); });
-  show(panels.some((p) => p.dataset.tab === saved) ? saved : "video");
+  const want = location.hash.slice(1) || saved;  // the chat's "write the key here" link opens #voice
+  show(panels.some((p) => p.dataset.tab === want) ? want : "video");
 
   const C = DATA.choices;
   $$(".seg[data-seg]").forEach((seg) => {
@@ -441,22 +495,45 @@ function build() {
   $("#animStyles").addEventListener("click", (e) => { const b = e.target.closest(".opt"); if (b) { $("#anim_custom").value = ""; set("defaults.anim_style", b.dataset.v); } });
   $("#anim_custom").addEventListener("input", (e) => { const v = e.target.value.trim(); if (v) set("defaults.anim_style", v); });
 
-  $("#palettes").innerHTML = Object.entries(DATA.palettes).map(([k, cs]) =>
-    `<button type="button" class="opt" data-v="${k}"><b>${PAL[k] || k}</b><small>${cs.join(" ")}</small><div class="sw">${cs.map((c) => `<i style="background:${c}"></i>`).join("")}</div></button>`).join("") +
-    `<button type="button" class="opt" data-v="custom"><b>Mis colores</b><small>Elige los cinco tú.</small><div class="sw" id="customSw"></div></button>`;
-  $("#customColors").innerHTML = ROLES.map((r) => `<label>${r}<input type="color" data-role="${r}"></label>`).join("");
+  const pal0 = S.defaults.palette;
+  palBase = typeof pal0 === "string" ? pal0
+    : Object.keys(DATA.palettes).find((k) => ROLES.every((r, i) => normHex(pal0[r]) === DATA.palettes[k][i])) || null;
+  $("#palettes").innerHTML = Object.entries(DATA.palettes).map(([k, cs]) => {
+    const [t, d] = PAL[k] || [k, ""];
+    return `<button type="button" class="opt" data-v="${k}"><b>${t}</b><small>${d}</small><div class="sw">${cs.map((c) => `<i style="background:${c}" title="${c}"></i>`).join("")}</div></button>`;
+  }).join("") +
+    `<button type="button" class="opt" data-v="custom"><b>Personalizada</b><small id="customSub">Edita cualquier color de abajo.</small><div class="sw" id="customSw"></div></button>`;
+  $("#customColors").innerHTML = ROLES.map((r) => `<div class="c">
+      <input type="color" data-role="${r}" aria-label="${r}">
+      <input type="text" class="hex" data-hex="${r}" maxlength="7" spellcheck="false" aria-label="${r} HEX">
+      <span><b>${r[0].toUpperCase() + r.slice(1)}</b><small>${ROLE_USE[r]}</small></span></div>`).join("");
+  const palDict = () => {
+    const cur = get("defaults.palette");
+    return typeof cur === "string" ? Object.fromEntries(ROLES.map((r, i) => [r, DATA.palettes[cur][i]])) : Object.assign({}, cur);
+  };
+  const setColor = (r, hex) => {
+    const d = palDict(); d[r] = hex;
+    const same = palBase && ROLES.every((x, i) => d[x] === DATA.palettes[palBase][i]);
+    set("defaults.palette", same ? palBase : d);
+  };
   $("#palettes").addEventListener("click", (e) => {
     const b = e.target.closest(".opt"); if (!b) return;
-    if (b.dataset.v === "custom") {
-      const cur = get("defaults.palette");
-      const base = typeof cur === "string" ? DATA.palettes[cur] : ROLES.map((r) => cur[r]);
-      set("defaults.palette", Object.fromEntries(ROLES.map((r, i) => [r, base[i]])));
-    } else set("defaults.palette", b.dataset.v);
+    if (b.dataset.v === "custom") set("defaults.palette", palDict());
+    else { palBase = b.dataset.v; set("defaults.palette", b.dataset.v); }
   });
   $("#customColors").addEventListener("input", (e) => {
-    const r = e.target.dataset.role; if (!r) return;
-    set("defaults.palette", Object.assign({}, get("defaults.palette"), { [r]: e.target.value.toUpperCase() }));
+    const t = e.target;
+    if (t.dataset.role) return setColor(t.dataset.role, t.value.toUpperCase());
+    if (t.dataset.hex) {
+      const h = normHex(t.value);
+      t.classList.toggle("bad", !h);
+      if (h) setColor(t.dataset.hex, h);
+    }
   });
+  $("#customColors").addEventListener("focusout", (e) => {
+    if (e.target.dataset.hex) { e.target.classList.remove("bad"); refresh(); }
+  });
+  $("#palReset").addEventListener("click", () => palBase && set("defaults.palette", palBase));
 
   $("#glossary").addEventListener("input", (e) =>
     set("glossary", e.target.value.split(",").map((x) => x.trim()).filter(Boolean)));
@@ -467,13 +544,31 @@ function build() {
   }).join("");
   $("#engines").addEventListener("click", (e) => { const b = e.target.closest(".opt"); if (b) set("voice.engine", b.dataset.v); });
 
-  $$("[data-secret]").forEach((b) => b.addEventListener("click", () => saveSecret(b.dataset.secret, $("#" + b.dataset.input))));
-  if (bridge.kind === "openai") {  // keys typed in ChatGPT would pass through its servers: use the local page
-    $$(".key").forEach((k) => {
-      k.innerHTML = `<button class="btn" data-local>Escríbela en la página local</button>`;
+  // Keys are typed only in the local page: what is typed inside a chat (Claude, ChatGPT) passes through the host.
+  $$("[data-keyfor]").forEach((box) => {
+    const name = box.dataset.keyfor, id = "key-" + name;
+    box.innerHTML = bridge.kind === "standalone"
+      ? `<div class="key"><input type="password" id="${id}" placeholder="${box.dataset.ph}" autocomplete="off" spellcheck="false">
+           <button type="button" class="btn" data-act="save">Guardar</button></div>
+         <div class="keyrow"><span class="status" data-status="${name}"></span>
+           <button type="button" class="btn small" data-act="test">${KEYS[name].test}</button>
+           <button type="button" class="btn small" data-act="clear">Borrar</button></div>
+         <span class="hint" style="margin:0">Se guarda solo en este ordenador (<code>~/.config/social-video-editor/secrets.json</code>, legible solo por tu usuario). No va al chat, ni al modelo, ni a la carpeta del proyecto. Consíguela en ${KEYS[name].where}.</span>`
+      : `<div class="keyrow"><span class="status" data-status="${name}"></span>
+           <button type="button" class="btn" data-act="local" id="${id}">Escribirla en la página local</button>
+           <button type="button" class="btn small" data-act="reload">Ya la he guardado</button></div>
+         <span class="hint" style="margin:0">Por seguridad, la clave no se escribe dentro del chat: se abre una página de tu ordenador y se guarda allí.</span>`;
+    box.addEventListener("click", (e) => {
+      const act = (e.target.closest("[data-act]") || {}).dataset; if (!act) return;
+      if (act.act === "save") saveSecret(name, $("#" + id));
+      if (act.act === "clear") saveSecret(name, null);
+      if (act.act === "test") testSecret(name);
+      if (act.act === "local") openLocal();
+      if (act.act === "reload") reloadSecrets();
     });
-    $$("[data-local]").forEach((b) => b.addEventListener("click", () => openLocal()));
-  }
+    const input = $("#" + id);
+    if (input.tagName === "INPUT") input.addEventListener("keydown", (e) => { if (e.key === "Enter") saveSecret(name, input); });
+  });
 
   $("#video_path").value = DATA.video_path || "";
   $("#save").addEventListener("click", () => save(false));
@@ -513,11 +608,22 @@ function refresh() {
 
   const pal = S.defaults.palette, custom = typeof pal !== "string";
   $$("#palettes .opt").forEach((b) => b.setAttribute("aria-pressed", custom ? b.dataset.v === "custom" : b.dataset.v === pal));
-  $("#customColors").hidden = !custom;
-  if (custom) {
-    $$("#customColors input").forEach((i) => (i.value = pal[i.dataset.role]));
-    $("#customSw").innerHTML = ROLES.map((r) => `<i style="background:${pal[r]}"></i>`).join("");
-  }
+  const cs = custom ? Object.fromEntries(ROLES.map((r) => [r, normHex(pal[r]) || "#000000"]))
+    : Object.fromEntries(ROLES.map((r, i) => [r, DATA.palettes[pal][i]]));
+  $$("#customColors input[type=color]").forEach((i) => (i.value = cs[i.dataset.role]));
+  $$("#customColors input.hex").forEach((i) => { if (i !== document.activeElement) i.value = cs[i.dataset.hex]; });
+  $("#customSw").innerHTML = custom ? ROLES.map((r) => `<i style="background:${cs[r]}"></i>`).join("") : "";
+  $("#customSub").textContent = custom && palBase ? "Basada en " + (PAL[palBase] || [palBase])[0] : "Edita cualquier color de abajo.";
+  $("#palReset").hidden = !(custom && palBase);
+  const card = $("#mockCard"), mcap = $("#mockCap");
+  card.style.background = cs.fondo; card.style.color = cs.texto; $("i", card).style.background = cs.secundario;
+  $("#mockBadge").style.cssText = `background:${cs.alerta};color:${cs.fondo}`;
+  mcap.style.color = cs.texto; $("span", mcap).style.color = cs.principal;
+  const low = Object.entries(MIN_CONTRAST).map(([r, min]) => [r, contrast(cs[r], cs.fondo), min]).filter(([, c, min]) => c < min);
+  $("#palCheck").textContent = low.length
+    ? "Poco contraste sobre el fondo: " + low.map(([r, c, min]) => `${r} ${c.toFixed(1).replace(".", ",")}:1 (mín. ${String(min).replace(".", ",")}:1)`).join(", ")
+    : "Buen contraste: todo se lee bien sobre el fondo.";
+  $("#palCheck").className = "status " + (low.length ? "warn" : "set");
   if (document.activeElement !== $("#glossary")) $("#glossary").value = (S.glossary || []).join(", ");
 
   const v = S.voice;
@@ -531,9 +637,15 @@ function refresh() {
 
   $$("[data-status]").forEach((el) => {
     const st = (DATA.secrets || {})[el.dataset.status];
-    el.textContent = st === "env" ? "Configurada (variable de entorno)" : st === "file" ? "Guardada en este ordenador" : "Sin configurar";
+    el.textContent = st === "env" ? "Configurada (llavero de la extensión o variable de entorno)" : st === "file" ? "Guardada en este ordenador" : "Sin configurar";
     el.className = "status" + (st ? " set" : "");
   });
+  $$("[data-keyfor]").forEach((box) => {
+    const st = (DATA.secrets || {})[box.dataset.keyfor];
+    $$("[data-act=test]", box).forEach((b) => (b.disabled = !st));
+    $$("[data-act=clear]", box).forEach((b) => (b.hidden = st !== "file"));
+  });
+  $("#mkeyMissing").hidden = !(cloud && !(DATA.secrets || {}).MISTRAL_API_KEY);
   $("#cfgPath").textContent = DATA.config_path || "";
   if (bridge.resize) setTimeout(bridge.resize, 0);
 }
@@ -581,15 +693,34 @@ async function save(andGo) {
 }
 
 async function saveSecret(name, input) {
-  const value = input.value;
-  msg("Guardando la clave…");
+  const value = input ? input.value.trim() : "";
+  if (input && !value) return msg("Pega la clave antes de guardar", "err");
+  msg(input ? "Guardando la clave…" : "Borrando la clave…");
   try {
     const r = await bridge.call("save_secret", { name, value });
-    if (r.isError) throw new Error(textOf(r));
+    if (r.isError) throw new Error(textOf(r).replace(/^Error: /, ""));
     DATA.secrets = (r.structuredContent || {}).secrets || DATA.secrets;
-    input.value = ""; refresh();
-    msg(value.trim() ? "Clave guardada en este ordenador (no en el chat ni en el proyecto)" : "Clave borrada", "good");
+    if (input) input.value = "";
+    refresh();
+    msg(value ? "Clave guardada en este ordenador (no en el chat ni en el proyecto)" : "Clave borrada", "good");
+    if (value) testSecret(name);
   } catch (e) { msg("No se pudo guardar la clave: " + e.message, "err"); }
+}
+
+async function testSecret(name) {
+  msg("Probando la clave…");
+  try {
+    const r = await bridge.call("test_secret", { name });
+    const ok = (r.structuredContent || {}).ok;
+    msg((ok ? "La clave " : "La clave no funciona: ") + textOf(r), ok ? "good" : "err");
+  } catch (e) { msg("No se pudo probar la clave: " + e.message, "err"); }
+}
+
+async function reloadSecrets() {
+  const r = await bridge.call("get_settings", {});
+  DATA.secrets = (r.structuredContent || {}).secrets || DATA.secrets;
+  refresh();
+  msg((DATA.secrets || {}).MISTRAL_API_KEY ? "Clave de Mistral detectada" : "Todavía no hay clave guardada", "good");
 }
 
 async function checkEnv() {
@@ -601,8 +732,9 @@ async function checkEnv() {
 }
 
 function openLocal() {
-  const url = DATA.ui_url;
+  const url = DATA.ui_url + "#voice";
   if (window.openai && window.openai.openExternal) window.openai.openExternal({ href: url });
+  else if (bridge.openLink) bridge.openLink(url).catch(() => window.open(url, "_blank", "noopener"));
   else window.open(url, "_blank", "noopener");
 }
 

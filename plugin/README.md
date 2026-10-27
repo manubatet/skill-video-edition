@@ -15,7 +15,18 @@ Claude / ChatGPT ──MCP──► plugin/server (Python, en tu ordenador) ─�
 - **Hugging Face**: los modelos se descargan la primera vez, en `<proyectos>/_shared/models`.
 - **Mistral**, solo si eliges *Mistral Voxtral* como motor de voz: se envían el fragmento de referencia (unos 10 s de voz) y el texto de cada frase. Con VoxCPM2 o CosyVoice 3, la voz también se genera en local.
 
-Las claves (Mistral, Hugging Face) se guardan en `~/.config/social-video-editor/secrets.json` (permisos 600), fuera de cualquier proyecto o repositorio. En Claude Desktop también puedes ponerlas en el llavero del sistema desde los ajustes de la extensión. Nunca llegan al modelo: las herramientas solo dicen si están configuradas.
+## Claves (Mistral, Hugging Face)
+
+El campo de la clave de Mistral solo aparece si activas la clonación de voz y eliges *Mistral Voxtral*. Si falta la clave, la pantalla lo avisa.
+
+- **Se escriben solo en la página local** (`http://127.0.0.1:8765`, en tu navegador). Dentro del chat (Claude o ChatGPT) no hay campo para la clave: un botón abre esa página, porque lo que se escribe dentro de un chat pasa por el servidor del chat.
+- **Guardar, Probar y Borrar no son herramientas MCP.** El modelo no puede leer, guardar ni borrar una clave: solo ve si está configurada. La página local las llama directamente al servidor, con su token, y el servidor las rechaza si llegan por un túnel.
+- Se guardan en `~/.config/social-video-editor/secrets.json` (permisos 600), fuera de cualquier proyecto o repositorio. En Claude Desktop también puedes ponerlas en el llavero del sistema desde los ajustes de la extensión.
+- **Probar** hace una llamada de solo lectura al propio servicio (`api.mistral.ai/v1/models`, `huggingface.co/api/whoami-v2`) para comprobar que la clave funciona.
+
+## Paleta de colores
+
+Siete propuestas (Energía, Calma, Pop, Tierra, Océano, Noche y Bosque), cada una con cinco colores: fondo, texto, principal, secundario y alerta. Puedes cambiar cualquiera de ellos con el selector de color o escribiendo su código HEX (`#RGB` o `#RRGGBB`). La paleta pasa a *Personalizada* y puedes volver a la propuesta original. Una vista previa muestra un subtítulo, una tarjeta y un aviso con esos colores. La pantalla avisa si el texto o el color principal tienen poco contraste sobre el fondo (mínimo 4,5:1; 3:1 para los demás).
 
 ## Instalación
 
@@ -73,7 +84,6 @@ El skill ya se detecta en `.agents/skills/`.
 | `open_settings` | Muestra la pantalla de ajustes (en el chat, o en el navegador si el host no tiene interfaz) |
 | `get_settings` | Los ajustes como resumen, más los bloques `style`/`captions` de `timeline.json` y los valores de corte de `edit.json`, listos para copiar |
 | `save_settings` | Guarda los ajustes si pides un cambio en el chat |
-| `save_secret` | Guarda una clave en local (solo la pantalla de ajustes) |
 | `get_skill_guide` | El `SKILL.md` completo o una sección |
 | `check_environment` | Revisa FFmpeg con libass, los entornos de Python y las claves |
 | `setup_project`, `list_projects` | Proyectos en la carpeta de proyectos |

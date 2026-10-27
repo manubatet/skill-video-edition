@@ -13,6 +13,8 @@ import copy
 import json
 import os
 import re
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 HOME_DIR = Path(os.environ.get("SVE_HOME", Path.home() / ".config" / "social-video-editor")).expanduser()
@@ -24,6 +26,9 @@ PALETTES = {  # fondo, texto, principal, secundario, alerta (SKILL.md > Color pa
     "calma": ["#1E3A4C", "#F7F5F0", "#5EC2B7", "#F4A261", "#E76F51"],
     "pop": ["#1A1033", "#FFFFFF", "#FF4FA3", "#7C5CFF", "#FFD23F"],
     "tierra": ["#2B2622", "#FAF6F0", "#D9B26F", "#8DB38B", "#C4553A"],
+    "oceano": ["#0B2545", "#F4F7FB", "#4CC9F0", "#FFB703", "#FF5D73"],
+    "noche": ["#0D0D14", "#F2F2F7", "#00E5FF", "#C77DFF", "#FF2E63"],
+    "bosque": ["#16261D", "#F3F1E7", "#9BD770", "#F2C14E", "#E4572E"],
 }
 ROLES = ("fondo", "texto", "principal", "secundario", "alerta")
 
@@ -191,6 +196,8 @@ def set_secret(name, value):
         raise ValueError(f"unknown secret {name}")
     data = _read_secrets()
     value = (value or "").strip()
+    if value and (len(value) < 16 or len(value) > 256 or any(c.isspace() for c in value)):
+        raise ValueError("no parece una clave: sin espacios y de 16 a 256 caracteres")
     if value:
         data[name] = value
     else:
@@ -200,6 +207,31 @@ def set_secret(name, value):
     with os.fdopen(fd, "w", encoding="utf-8") as f:
         json.dump(data, f)
     os.chmod(SECRETS_FILE, 0o600)
+
+
+KEY_CHECKS = {  # a read-only call that only succeeds with a valid key
+    "MISTRAL_API_KEY": "https://api.mistral.ai/v1/models",
+    "HF_TOKEN": "https://huggingface.co/api/whoami-v2",
+}
+
+
+def test_secret(name):
+    """Try the saved key against its own service. Returns (ok, message for the settings page); never the key."""
+    if name not in KEY_CHECKS:
+        raise ValueError(f"unknown secret {name}")
+    key = get_secret(name)
+    if not key:
+        return False, "no hay ninguna clave guardada."
+    req = urllib.request.Request(KEY_CHECKS[name], headers={"Authorization": f"Bearer {key}"})
+    try:
+        with urllib.request.urlopen(req, timeout=10):
+            return True, "funciona."
+    except urllib.error.HTTPError as e:
+        if e.code in (401, 403):
+            return False, "el servicio la ha rechazado."
+        return False, f"el servicio ha respondido {e.code}; prueba más tarde."
+    except (urllib.error.URLError, OSError) as e:
+        return False, f"no se ha podido contactar con el servicio: {getattr(e, 'reason', e)}"
 
 
 # ---- what the agent gets -------------------------------------------------------------------
