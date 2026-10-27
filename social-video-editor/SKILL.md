@@ -22,6 +22,16 @@ This skill follows the open Agent Skills format, so the same folder works in Cla
 
 In this file, "the agent" means whichever assistant is running the skill.
 
+## Start here: ask everything first
+
+The user's choices come first, before any work. The run's **first action** is one of these, before reading or probing the video, opening links, checking for updates, checking the environment or running Setup:
+- **With the plugin** (an `open_settings` tool is available): call `open_settings` with the video path. The settings screen is the intake. See *Plugin mode*.
+- **Without it:** ask the whole *Intake* now, in one go (both rounds back to back), together with:
+  - the projects folder, if the user config doesn't set it (Setup step 1);
+  - any question the request itself raises. For example, for "use this video's intro to make a video about this article": where the intro ends, how long the new video should be, and whether the article's text becomes captions, a voice-over or animations.
+
+If the answer to a question depends on something you have not seen yet (the video, the article), ask it with your best guess as the recommended option, and confirm it at Checkpoint 1. After the answers, work through Setup and the Workflow without new questions until Checkpoint 1, except for blockers (a missing key, a failed install).
+
 ## Core principles
 
 1. **The agent decides, scripts execute.** The agent only writes JSON decision files and animation code. Deterministic scripts do all the media work. Never hand-edit video with ad-hoc FFmpeg commands when a script covers the step.
@@ -51,7 +61,7 @@ Never skip a checkpoint because a tool is missing. Use the fallback instead.
 
 When the `social-video-editor` MCP tools are available (the Claude or ChatGPT plugin, see `plugin/README.md` in the repository), the user has already chosen the options in its settings UI. Use the tools instead of the intake and the shell:
 
-- **Settings, at the start of every edit.** The settings UI replaces the *Intake* questions. Call `open_settings` with the video path before `setup_project`, so the user reviews this run's options (the saved values are filled in).
+- **Settings, first, on every edit.** The settings UI replaces the *Intake* questions. Call `open_settings` with the video path as the run's first action (see *Start here*), so the user reviews this run's options (the saved values are filled in). Ask any question the request itself raises in the same turn.
   - If the UI is shown in the chat, end your turn and wait: the user's "Guardar y editar" sends a message.
   - If it opened in the browser (Claude Code, Codex), call `wait_for_settings` with `wait_s: 50` until it returns `confirmed`. It also returns the video path the user entered.
   - Then call `get_settings` and say in one line what you are using, as in *User config*. Copy its `timeline_defaults` (the `style` and `captions` blocks) into `timeline.json` and its `edit_defaults` into `edit.json`. Respect `effects` (zooms, sfx, animations), the caption mode (`off` = no captions), the platform, the video type and the user's notes.
@@ -157,7 +167,7 @@ If a model download is blocked (sandboxed or offline machine), switch to runtime
 
 ## Intake: two quick rounds
 
-Skip every question the user config already answers (see *User config*), and state the reused answers in one line. Ask using the *Ask structured questions* ability. The recommended option comes first. If nobody answers, use the defaults and state them. With a question tool that caps questions per call (Claude Code: 4 questions × 4 options, plus an automatic "Other"), run the intake as two calls back to back. In a plain chat message, send round 1, wait for the answer, then send round 2. Either way, ask before any heavy work starts. Wherever this section says "Other", the chat fallback is the "Otro: …" line.
+Skip every question the user config already answers (see *User config*), and state the reused answers in one line. Ask using the *Ask structured questions* ability. The recommended option comes first. If nobody answers, use the defaults and state them. With a question tool that caps questions per call (Claude Code: 4 questions × 4 options, plus an automatic "Other"), run the intake as two calls back to back. In a plain chat message, send round 1, wait for the answer, then send round 2. Either way, this is the run's first action (see *Start here*), before Setup or any other work. Wherever this section says "Other", the chat fallback is the "Otro: …" line.
 
 ### Round 1: what to add
 

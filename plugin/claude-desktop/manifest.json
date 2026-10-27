@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "social-video-editor",
   "display_name": "Social Video Editor",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "Edita en tu ordenador vídeos de cabeza parlante en español para redes: cortes, subtítulos, zooms, SFX, animaciones y voz clonada.",
   "long_description": "Todas las opciones (tipo de vídeo, subtítulos, efectos, estilo, paleta, motor de voz, clave de Mistral, carpeta de proyectos) se eligen en una pantalla de ajustes dentro del chat. El vídeo se edita entero en tu ordenador con WhisperX, FFmpeg y Pillow. Solo sale algo de él si eliges Mistral para clonar la voz: el fragmento de referencia y el texto de cada frase.",
   "author": { "name": "manubatet", "url": "https://github.com/manubatet" },

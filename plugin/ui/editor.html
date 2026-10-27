@@ -398,7 +398,7 @@ const bridge = (() => {
       const got = new Promise((res) => { onResult = (r) => res(r && r.structuredContent); });
       try {
         const init = await Promise.race([
-          request("ui/initialize", { protocolVersion: "2026-01-26", appInfo: { name: "social-video-editor", version: "1.3.0" }, appCapabilities: {} }),
+          request("ui/initialize", { protocolVersion: "2026-01-26", appInfo: { name: "social-video-editor", version: "1.4.0" }, appCapabilities: {} }),
           new Promise((_, rej) => setTimeout(() => rej(new Error("no host")), 4000))]);
         applyHost((init && init.hostContext) || {});
         post({ method: "ui/notifications/initialized", params: {} });

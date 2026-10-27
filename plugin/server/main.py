@@ -30,20 +30,21 @@ import settings as cfg  # noqa: E402
 import tools  # noqa: E402
 from tools import ToolError  # noqa: E402
 
-NAME, VERSION = "social-video-editor", "1.3.0"
+NAME, VERSION = "social-video-editor", "1.4.0"
 PROTOCOLS = ("2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05")
 UI_URI = "ui://social-video-editor/settings.html"
 UI_URI_SKYBRIDGE = "ui://social-video-editor/settings-skybridge.html"
 UI_MIME = "text/html;profile=mcp-app"
 
 INSTRUCTIONS = """Edits Spanish talking-head videos for social media on the user's own machine.
-1. If the social-video-editor skill is not loaded in this conversation, call get_skill_guide first and follow it.
-2. Every edit starts in the settings UI, so the user can review this run's options (captions, effects, style,
-   palette, voice engine…) instead of answering the intake questions. Call open_settings with the video path
-   before setup_project. If the UI is shown in the chat, end your turn: the user's "Guardar y editar" sends a
-   message. Otherwise (it opened in the browser) call wait_for_settings until it returns confirmed. Then call
-   get_settings and say in one line what you are using. If the user asks to change an option in chat, use
-   save_settings.
+1. Start every edit with open_settings (pass the video path if you know it), before reading the video, opening
+   links, checking the environment or anything else: the user reviews this run's options (captions, effects,
+   style, palette, voice engine…) there instead of answering the intake questions. Ask any question the request
+   itself raises (which part of the video, how long, a linked article's role…) in the same turn.
+2. If the UI is shown in the chat, end your turn: the user's "Guardar y editar" sends a message. Otherwise (it
+   opened in the browser), read get_skill_guide if the social-video-editor skill is not loaded, then call
+   wait_for_settings until it returns confirmed. Then call get_settings and say in one line what you are using.
+   If the user asks to change an option in chat, use save_settings.
 3. Use these tools instead of a shell: setup_project, run_step (+ job_status for long steps),
    read_project_file / write_project_file for the decision files and animations, view_image to look at
    frames and QA sheets. Keep the skill's two checkpoints (cut plan + effects table, then the preview).
@@ -84,7 +85,8 @@ APP_ONLY = {"ui": {"visibility": ["app"]}, "openai/visibility": "private", "open
 
 TOOLS = [
     ("open_settings", "Show the settings UI (video type, captions, effects, style, palette, voice engine, Mistral "
-     "key, projects folder…). Call it at the start of every edit, so the user reviews this run's options, and "
+     "key, projects folder…). Call it first on every edit, before any other tool, so the user reviews this run's "
+     "options, and "
      "whenever they want to see or change them. In hosts without in-chat UI it opens a local page in the "
      "browser; then call wait_for_settings.",
      schema({"video_path": {"type": "string", "description": "optional: the video the user wants to edit"},
