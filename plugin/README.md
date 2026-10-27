@@ -8,6 +8,13 @@ Claude / ChatGPT ──MCP──► plugin/server (Python, en tu ordenador) ─�
         └── pantalla de ajustes ◄─┘  (dentro del chat, o en http://127.0.0.1:8765)
 ```
 
+## Cómo es una edición
+
+1. Pides en el chat que edite un vídeo (por ejemplo, "edita /ruta/al/vídeo.mov").
+2. **Se abre la pantalla de ajustes** con tus valores guardados y el vídeo ya puesto: dentro del chat en Claude Desktop y ChatGPT, o en tu navegador en Claude Code y Codex. Un aviso dice que el agente está esperando.
+3. Revisas o cambias lo que quieras para este vídeo y pulsas **Guardar y editar**. Lo que cambias queda guardado como valor por defecto para la próxima vez.
+4. El agente empieza: transcribe, propone el plan de cortes y efectos (primer punto de control), monta la vista previa (segundo punto de control) y, cuando das el visto bueno, renderiza el vídeo final en `final/`.
+
 ## Qué sale de tu ordenador
 
 - **El vídeo, nunca.** Se transcribe, se corta, se anima y se renderiza en local.
@@ -81,7 +88,8 @@ El skill ya se detecta en `.agents/skills/`.
 
 | Herramienta | Para qué |
 |---|---|
-| `open_settings` | Muestra la pantalla de ajustes (en el chat, o en el navegador si el host no tiene interfaz) |
+| `open_settings` | Muestra la pantalla de ajustes al empezar cada edición (en el chat, o en el navegador si el host no tiene interfaz) |
+| `wait_for_settings` | Espera a que pulses *Guardar y editar* en la página local (Claude Code, Codex) |
 | `get_settings` | Los ajustes como resumen, más los bloques `style`/`captions` de `timeline.json` y los valores de corte de `edit.json`, listos para copiar |
 | `save_settings` | Guarda los ajustes si pides un cambio en el chat |
 | `get_skill_guide` | El `SKILL.md` completo o una sección |

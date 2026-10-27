@@ -38,15 +38,19 @@ UI_MIME = "text/html;profile=mcp-app"
 
 INSTRUCTIONS = """Edits Spanish talking-head videos for social media on the user's own machine.
 1. If the social-video-editor skill is not loaded in this conversation, call get_skill_guide first and follow it.
-2. Call get_settings instead of asking the intake questions: the user chose captions, effects, style, palette,
-   voice engine, etc. in the settings UI. Say in one line what you are reusing. To change settings, call
-   open_settings (shows the UI) or, if the user asks in chat, save_settings.
+2. Every edit starts in the settings UI, so the user can review this run's options (captions, effects, style,
+   palette, voice engine…) instead of answering the intake questions. Call open_settings with the video path
+   before setup_project. If the UI is shown in the chat, end your turn: the user's "Guardar y editar" sends a
+   message. Otherwise (it opened in the browser) call wait_for_settings until it returns confirmed. Then call
+   get_settings and say in one line what you are using. If the user asks to change an option in chat, use
+   save_settings.
 3. Use these tools instead of a shell: setup_project, run_step (+ job_status for long steps),
    read_project_file / write_project_file for the decision files and animations, view_image to look at
    frames and QA sheets. Keep the skill's two checkpoints (cut plan + effects table, then the preview).
 4. Never ask the user to paste an API key in chat; keys are entered in the settings UI and never reach you."""
 
 STATE = {"token": None, "ui_url": None, "ui_server": None, "client_ui": False, "http": False}
+RUN = {"event": threading.Event(), "video_path": None, "pending": False, "waiting": 0}  # "Guardar y editar"
 
 
 def token():
@@ -76,14 +80,22 @@ UI_META = {"ui": {"resourceUri": UI_URI}, "ui/resourceUri": UI_URI, "openai/outp
            "openai/toolInvocation/invoked": "Ajustes listos"}
 WIDGET_OK = {"ui": {"visibility": ["model", "app"]}, "openai/widgetAccessible": True}
 RO = {"readOnlyHint": True, "openWorldHint": False}
+APP_ONLY = {"ui": {"visibility": ["app"]}, "openai/visibility": "private", "openai/widgetAccessible": True}
 
 TOOLS = [
     ("open_settings", "Show the settings UI (video type, captions, effects, style, palette, voice engine, Mistral "
-     "key, projects folder…). Call it when the user wants to see or change the options, or before a first edit "
-     "when no settings were saved yet. In hosts without in-chat UI it opens a local page in the browser.",
+     "key, projects folder…). Call it at the start of every edit, so the user reviews this run's options, and "
+     "whenever they want to see or change them. In hosts without in-chat UI it opens a local page in the "
+     "browser; then call wait_for_settings.",
      schema({"video_path": {"type": "string", "description": "optional: the video the user wants to edit"},
-             "open_browser": {"type": "boolean", "description": "open the local page in the user's browser"}}),
+             "open_browser": {"type": "boolean", "description": "open the local page in the user's browser"},
+             "reload": {"type": "boolean", "description": "set only by the settings UI when it loads"}}),
      UI_META, RO),
+    ("wait_for_settings", "After open_settings opened the browser: wait until the user presses \"Guardar y "
+     "editar\" in the settings page. wait_s (≤55) blocks; call again while confirmed is false. Returns the video "
+     "path the user entered.", schema({"wait_s": {"type": "number"}}), WIDGET_OK, RO),
+    ("confirm_settings", "Settings UI only: the user pressed \"Guardar y editar\" (start this run).",
+     schema({"video_path": {"type": "string"}}), APP_ONLY, {"openWorldHint": False}),
     ("get_settings", "The user's saved choices as a brief, plus ready-to-copy timeline.json style/captions and "
      "edit.json cut defaults. Use it instead of the intake questions.", schema(), WIDGET_OK, RO),
     ("save_settings", "Save the full settings object (as returned by get_settings.settings, modified). Only when "
@@ -145,6 +157,7 @@ def settings_payload(s, video_path=None):
     view["jobs"] = tools.running_jobs()
     view["ui_url"] = ensure_ui_server()
     view["video_path"] = video_path
+    view["run_pending"] = RUN["pending"]
     view["skill_version"] = (tools.skill_dir() / "VERSION").read_text().strip()
     return view
 
@@ -166,14 +179,36 @@ def section(md, heading):
 def call_tool(name, a):
     s = cfg.load_settings()
     if name == "open_settings":
-        data = settings_payload(s, a.get("video_path"))
+        if not a.get("reload"):  # a new run; the page's own load (reload) keeps the run it belongs to
+            RUN["event"].clear()
+            RUN.update(video_path=a.get("video_path"), pending=True)
+        data = settings_payload(s, RUN["video_path"])
         opened = False
         if a.get("open_browser") or (a.get("open_browser") is None and not STATE["client_ui"] and not STATE["http"]):
             opened = webbrowser.open(data["ui_url"])
         where = "shown above" if STATE["client_ui"] else ("opened in the browser" if opened else "")
         return result(f"Settings UI {where}. Local page (this machine only): {data['ui_url']}\n"
                       f"Current settings:\n{cfg.brief(s)}\n"
-                      "Wait for the user to save, then call get_settings.", data)
+                      + ("Wait for the user's message, then call get_settings." if STATE["client_ui"] else
+                         "Call wait_for_settings until the user presses \"Guardar y editar\", then get_settings."),
+                      data)
+    if name == "confirm_settings":
+        RUN.update(video_path=(a.get("video_path") or "").strip() or None, pending=False)
+        RUN["event"].set()
+        return result("Run confirmed.", {"confirmed": True, "agent_waiting": RUN["waiting"] > 0})
+    if name == "wait_for_settings":
+        RUN["waiting"] += 1
+        try:
+            done = RUN["event"].wait(max(0, min(float(a.get("wait_s", 50)), 55)))
+        finally:
+            RUN["waiting"] -= 1
+        if not done:
+            return result("Still waiting for the user to press \"Guardar y editar\". Call wait_for_settings again.",
+                          {"confirmed": False})
+        vp = RUN["video_path"]
+        return result("The user confirmed this run's settings" + (f" for {vp}" if vp else "")
+                      + ". Call get_settings and start.\n" + cfg.brief(cfg.load_settings()),
+                      {"confirmed": True, "video_path": vp})
     if name == "get_settings":
         data = {"brief": cfg.brief(s), "timeline_defaults": cfg.timeline_defaults(s),
                 "edit_defaults": cfg.edit_defaults(s), "projects_dir": str(cfg.projects_dir(s)),

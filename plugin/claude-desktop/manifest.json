@@ -23,10 +23,11 @@
     }
   },
   "tools": [
-    { "name": "open_settings", "description": "Pantalla de ajustes: vídeo, subtítulos, efectos, estilo, voz y carpeta." },
+    { "name": "open_settings", "description": "Pantalla de ajustes al empezar cada edición: vídeo, subtítulos, efectos, estilo, voz y carpeta." },
+    { "name": "wait_for_settings", "description": "Espera a que pulses Guardar y editar en la página local." },
+    { "name": "confirm_settings", "description": "Guardar y editar (solo desde la pantalla de ajustes)." },
     { "name": "get_settings", "description": "Los ajustes guardados, listos para la edición." },
     { "name": "save_settings", "description": "Guarda los ajustes." },
-    { "name": "save_secret", "description": "Guarda una clave en este ordenador (solo desde la pantalla de ajustes)." },
     { "name": "get_skill_guide", "description": "El procedimiento completo de edición." },
     { "name": "check_environment", "description": "Revisa FFmpeg, los entornos de Python y las claves." },
     { "name": "list_projects", "description": "Proyectos y pasos hechos." },

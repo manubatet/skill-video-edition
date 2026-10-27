@@ -142,6 +142,7 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 1
     <span class="chip" id="privacy"><span class="dot"></span><span id="privacyText">Todo en tu ordenador</span></span>
   </header>
 
+  <div class="note" id="runNote" hidden style="margin:0 0 12px"><b>Claude está esperando.</b> Revisa las opciones para este vídeo y pulsa <b>Guardar y editar</b> para empezar.</div>
   <nav class="tabs" role="tablist" id="tabs"></nav>
 
   <div class="panel" data-tab="video" data-label="Vídeo">
@@ -357,7 +358,7 @@ const bridge = (() => {
           method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, arguments: args || {} }) });
         return r.json();
       },
-      async boot() { return (await this.call("open_settings", { open_browser: false })).structuredContent; },
+      async boot() { return (await this.call("open_settings", { open_browser: false, reload: true })).structuredContent; },
       message: null,
     };
   }
@@ -367,7 +368,7 @@ const bridge = (() => {
       async call(name, args) { return window.openai.callTool(name, args || {}); },
       async boot() {
         if (window.openai.toolOutput && window.openai.toolOutput.settings) return window.openai.toolOutput;
-        return (await this.call("open_settings", { open_browser: false })).structuredContent;
+        return (await this.call("open_settings", { open_browser: false, reload: true })).structuredContent;
       },
       message(text) { return window.openai.sendFollowUpMessage({ prompt: text }); },
       theme() { return window.openai.theme; },
@@ -404,7 +405,7 @@ const bridge = (() => {
       } catch (e) { /* older hosts: the tool result may still arrive */ }
       const first = await Promise.race([got, new Promise((r) => setTimeout(() => r(null), 2500))]);
       if (first && first.settings) return first;
-      return (await this.call("open_settings", { open_browser: false })).structuredContent;
+      return (await this.call("open_settings", { open_browser: false, reload: true })).structuredContent;
     },
     message(text) { return request("ui/message", { role: "user", content: [{ type: "text", text }] }); },
     openLink(url) { return request("ui/open-link", { url }); },
@@ -575,7 +576,7 @@ function build() {
   $("#go").addEventListener("click", () => save(true));
   $("#checkEnv").addEventListener("click", checkEnv);
   $("#ver").textContent = "v" + (DATA.skill_version || "");
-  $("#go").textContent = bridge.message ? "Guardar y editar" : "Guardar y copiar la orden";
+  $("#go").textContent = "Guardar y editar";
 }
 
 /* ---------- paint the current values ---------- */
@@ -650,6 +651,11 @@ function refresh() {
   if (bridge.resize) setTimeout(bridge.resize, 0);
 }
 
+function paintRun() {
+  $("#runNote").hidden = !DATA.run_pending;
+  if (bridge.resize) setTimeout(bridge.resize, 0);
+}
+
 function paintProjects() {
   const ps = DATA.projects || [];
   $("#projSub").textContent = "En " + (DATA.projects_dir || "") + (ps.length ? "" : " todavía no hay ninguno.");
@@ -683,7 +689,10 @@ async function save(andGo) {
     const vp = $("#video_path").value.trim();
     const order = vp ? `Edita el vídeo ${vp} con mis ajustes guardados del Social Video Editor.`
                      : "Ya he guardado mis ajustes del Social Video Editor. Vamos a editar un vídeo.";
+    const c = await bridge.call("confirm_settings", { video_path: vp });  // wakes wait_for_settings
+    DATA.run_pending = false; paintRun();
     if (bridge.message) { await bridge.message(order); msg("Enviado al chat", "good"); }
+    else if ((c.structuredContent || {}).agent_waiting) msg("Listo: Claude empieza a editar con estas opciones. Vuelve al chat.", "good");
     else {
       try { await navigator.clipboard.writeText(order); msg("Guardado. Orden copiada: pégala en el chat.", "good"); }
       catch (e) { msg("Guardado. Escribe en el chat: " + order, "good"); }
@@ -747,7 +756,7 @@ window.addEventListener("openai:set_globals", () => bridge.theme && applyHost({ 
 bridge.boot().then((data) => {
   if (!data || !data.settings) throw new Error("sin datos del servidor");
   DATA = data; S = data.settings;
-  build(); refresh(); paintProjects();
+  build(); refresh(); paintProjects(); paintRun();
   msg(bridge.kind === "standalone" ? "Página local: solo se ve en este ordenador" : "Listo");
   $("#go").disabled = false;
   window.addEventListener("beforeunload", (e) => { if (dirty && bridge.kind === "standalone") { e.preventDefault(); e.returnValue = ""; } });
