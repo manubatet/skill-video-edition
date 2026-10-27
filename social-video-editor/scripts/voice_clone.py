@@ -8,6 +8,11 @@ Engines (edit.json "voice.engine"):
               Qwen3-TTS and Chatterbox on accent fidelity and naturalness.
   cosyvoice   CosyVoice 3 (Apache-2.0, local, 0.5B, 24 kHz). Lighter; needs a clone of the
               FunAudioLLM/CosyVoice repo (voice.cosyvoice_dir) and its own environment.
+  openrouter  OpenRouter API (pay per use, cloud): cloning models such as fish-audio/s2.1-pro get
+              the reference clip and its transcript in every request (nothing is stored there).
+              Key from the env var in voice.openrouter_key_env.
+  mistral     Mistral API, Voxtral TTS 3 (pay per use, cloud): the reference clip goes with every
+              request (one-off cloning, nothing saved). Key from voice.mistral_key_env.
   elevenlabs  ElevenLabs API (paid, cloud). DISABLED for now: load_elevenlabs is kept and tested;
               add it back to ENGINES to enable it. Key from the env var in voice.api_key_env.
 
@@ -21,7 +26,11 @@ Settings (edit.json "voice", all optional except consent):
     "ref": [31.2, 43.0],      # source seconds of clean speech to clone from; null = pick automatically
     "ref_file": null,         # or a saved reference wav (e.g. _shared/voices/<speaker>/ref.wav);
                               # its transcript goes in ref.txt next to it (voxcpm needs it)
-    "engine": "voxcpm",       # voxcpm | cosyvoice (elevenlabs is disabled for now)
+    "engine": "voxcpm",       # voxcpm | cosyvoice | openrouter (elevenlabs is disabled for now)
+    "mistral_model": "voxtral-mini-tts-3-0",     # mistral: Voxtral TTS model id
+    "mistral_key_env": "MISTRAL_API_KEY",        # mistral: env var holding the key
+    "openrouter_model": "fish-audio/s2.1-pro",   # openrouter: a model with supports_voice_cloning
+    "openrouter_key_env": "OPENROUTER_API_KEY",  # openrouter: env var holding the key
     "cosyvoice_dir": null,    # cosyvoice: path to the cloned FunAudioLLM/CosyVoice repo
     "cosyvoice_model": "FunAudioLLM/Fun-CosyVoice3-0.5B-2512",   # cosyvoice: HF repo id or local folder
     "steps": 25,              # voxcpm: diffusion steps (10 = fast draft, 25-30 = clean final audio)
@@ -35,6 +44,7 @@ reference) and work/voice/manifest.json. Unchanged lines are not regenerated; --
 build_edit.py splices the patches into the source audio; render.py mixes the voice-overs.
 """
 import argparse
+import base64
 import hashlib
 import json
 import os
@@ -52,12 +62,17 @@ from common import die, load, need, run, save, wav_duration  # noqa: E402
 
 VOICE_DEFAULTS = {"consent": False, "ref": None, "ref_file": None, "engine": "voxcpm", "steps": 25,
                   "cfg_value": 2.0, "cosyvoice_dir": None,
-                  "cosyvoice_model": "FunAudioLLM/Fun-CosyVoice3-0.5B-2512", "api_key_env": "ELEVENLABS_API_KEY",
+                  "cosyvoice_model": "FunAudioLLM/Fun-CosyVoice3-0.5B-2512", "openrouter_model": "fish-audio/s2.1-pro",
+                  "openrouter_key_env": "OPENROUTER_API_KEY", "mistral_model": "voxtral-mini-tts-3-0",
+                  "mistral_key_env": "MISTRAL_API_KEY", "api_key_env": "ELEVENLABS_API_KEY",
                   "elevenlabs_model": "eleven_multilingual_v2", "seed": 7}
 ENGINE_SETTINGS = {"voxcpm": ("steps", "cfg_value", "seed"), "cosyvoice": ("cosyvoice_model", "seed"),
+                   "openrouter": ("openrouter_model", "seed"), "mistral": ("mistral_model", "seed"),
                    "elevenlabs": ("elevenlabs_model", "seed")}
 REF_MIN, REF_IDEAL, REF_MAX = 5.0, 8.0, 15.0  # seconds of reference speech
 ELEVENLABS_API = "https://api.elevenlabs.io/v1"
+OPENROUTER_API = "https://openrouter.ai/api/v1"
+MISTRAL_API = "https://api.mistral.ai/v1"
 SR = 48000
 
 
@@ -213,6 +228,62 @@ def load_cosyvoice(device, ref, ref_text, cfg, work):
     return synth, "CosyVoice 3"
 
 
+def load_openrouter(device, ref, ref_text, cfg, work):
+    key = os.environ.get(cfg["openrouter_key_env"], "").strip()
+    if not key:
+        die(f"set the OpenRouter API key in the environment variable {cfg['openrouter_key_env']} (in the shell "
+            "that runs this script; never in a file that goes to git)")
+    refs = [{"type": "input_audio", "input_audio": {
+        "data": "data:audio/wav;base64," + base64.b64encode(Path(ref).read_bytes()).decode()}}]
+    if ref_text:  # the transcript improves cloning on models that use it (Fish Audio); others ignore it
+        refs.append({"type": "text", "text": ref_text})
+
+    def synth(text):
+        body = json.dumps({"model": cfg["openrouter_model"], "input": text, "input_references": refs,
+                           "response_format": "mp3"}).encode()
+        req = urllib.request.Request(f"{OPENROUTER_API}/audio/speech", data=body, method="POST",
+                                     headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"})
+        try:
+            with urllib.request.urlopen(req, timeout=180) as r:
+                mp3 = r.read()
+        except urllib.error.HTTPError as e:
+            die(f"OpenRouter API error {e.code}: {e.read().decode(errors='replace')[:500]}")
+        tmp = work / "voice" / "_or.mp3"
+        tmp.write_bytes(mp3)
+        wav = tmp.with_suffix(".wav")
+        run(["ffmpeg", "-y", "-i", str(tmp), "-ac", "1", "-ar", str(SR), str(wav)])
+        x, sr = read_wav(wav)
+        tmp.unlink()
+        wav.unlink()
+        return x, sr
+    return synth, f"OpenRouter {cfg['openrouter_model']}"
+
+
+def load_mistral(device, ref, ref_text, cfg, work):
+    key = os.environ.get(cfg["mistral_key_env"], "").strip()
+    if not key:
+        die(f"set the Mistral API key in the environment variable {cfg['mistral_key_env']} (in the shell that "
+            "runs this script; never in a file that goes to git)")
+    ref_b64 = base64.b64encode(Path(ref).read_bytes()).decode()  # plain base64; URLs are not accepted
+
+    def synth(text):
+        body = json.dumps({"model": cfg["mistral_model"], "input": text, "ref_audio": ref_b64,
+                           "response_format": "wav"}).encode()
+        req = urllib.request.Request(f"{MISTRAL_API}/audio/speech", data=body, method="POST",
+                                     headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"})
+        try:
+            with urllib.request.urlopen(req, timeout=180) as r:
+                wav_bytes = base64.b64decode(json.loads(r.read())["audio_data"])
+        except urllib.error.HTTPError as e:
+            die(f"Mistral API error {e.code}: {e.read().decode(errors='replace')[:500]}")
+        tmp = work / "voice" / "_mistral.wav"
+        tmp.write_bytes(wav_bytes)
+        x, sr = read_wav(tmp)
+        tmp.unlink()
+        return x, sr
+    return synth, f"Mistral {cfg['mistral_model']}"
+
+
 def _el_request(url, key, body, content_type):
     req = urllib.request.Request(url, data=body, method="POST",
                                  headers={"xi-api-key": key, "Content-Type": content_type})
@@ -263,7 +334,8 @@ def load_elevenlabs(device, ref, ref_text, cfg, work):
     return synth, f"ElevenLabs {cfg['elevenlabs_model']} (voice {voice_id})"
 
 
-ENGINES = {"voxcpm": load_voxcpm, "cosyvoice": load_cosyvoice}
+ENGINES = {"voxcpm": load_voxcpm, "cosyvoice": load_cosyvoice, "openrouter": load_openrouter,
+           "mistral": load_mistral}
 # Turned off until it is needed; enabling it is one line: ENGINES["elevenlabs"] = load_elevenlabs
 DISABLED_ENGINES = {"elevenlabs": load_elevenlabs}
 
@@ -326,7 +398,7 @@ def main():
             print(f"  {ln['id']}: unchanged ({manifest[ln['id']]['duration']:.2f}s)")
             continue
         if synth is None:
-            device = pick_device(args.device) if cfg["engine"] != "elevenlabs" else None
+            device = pick_device(args.device) if cfg["engine"] in ("voxcpm", "cosyvoice") else None
             synth, label = ENGINES[cfg["engine"]](device, ref, ref_text, cfg, work)
             print(f"model: {label}")
         cfg["seed"] = line_settings["seed"]
