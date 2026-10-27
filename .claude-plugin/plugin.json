@@ -1,0 +1,16 @@
+{
+  "name": "social-video-editor",
+  "version": "1.3.0",
+  "description": "Edita vídeos de cabeza parlante en español para Reels, TikTok, Shorts y LinkedIn en tu propio ordenador: cortes, subtítulos, zooms, SFX, animaciones y voz clonada, con todas las opciones en una pantalla de ajustes.",
+  "author": { "name": "manubatet", "url": "https://github.com/manubatet" },
+  "homepage": "https://github.com/manubatet/skill-video-edition",
+  "repository": "https://github.com/manubatet/skill-video-edition",
+  "keywords": ["video", "reels", "tiktok", "subtitles", "whisperx", "ffmpeg", "voice-cloning", "spanish"],
+  "skills": "./social-video-editor",
+  "mcpServers": {
+    "social-video-editor": {
+      "command": "python3",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/plugin/server/main.py"]
+    }
+  }
+}

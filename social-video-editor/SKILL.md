@@ -47,6 +47,20 @@ The procedure needs four abilities. Each can be done in more than one way, depen
 
 Never skip a checkpoint because a tool is missing. Use the fallback instead.
 
+## Plugin mode (MCP tools)
+
+When the `social-video-editor` MCP tools are available (the Claude or ChatGPT plugin, see `plugin/README.md` in the repository), the user has already chosen the options in its settings UI. Use the tools instead of the intake and the shell:
+
+- **Settings.** Call `get_settings` instead of asking the *Intake* questions. Say in one line what you are reusing, as in *User config*. Copy its `timeline_defaults` (the `style` and `captions` blocks) into `timeline.json` and its `edit_defaults` into `edit.json`. Respect `effects` (zooms, sfx, animations), the caption mode (`off` = no captions), the platform, the video type and the user's notes. If nothing was saved yet, or the user wants to change something, call `open_settings` and wait for them to save. Ask in chat only what the settings don't cover (the glossary for this video, the cut plan, consent).
+- **Setup.** `check_environment` replaces the runtime check, and `setup_project` replaces Setup steps 1–2 (it links the video and copies the scripts).
+- **Commands.** Each command in *Workflow* is one `run_step`: `transcribe`, `build_edit`, `voice_clone`, `align_voice`, `animation` (with `id`), `check`, `preview` (also writes the QA sheet) and `final` (also copies it to `final/`). Steps run in the background: call `job_status` with `wait_s: 50` until the state is `done` or `failed`, and read the log tail.
+- **Files.** Write `edit.json`, `timeline.json`, transcript text fixes, `anims/<id>.py` and `final/extras.md` with `write_project_file`. Read anything in the project with `read_project_file`.
+- **Images.** `view_image` is the *Look at images* ability: the QA sheet, the animation sheets and any frame of the source, cut, preview or final video.
+- **Voice.** The engine comes from the settings, and `run_step voice_clone` writes it into `edit.json`. If voice cloning is off, don't offer voice patches or voice-overs. With `mistral`, tell the user once, before the first generation, that the reference clip and each line's text go to Mistral.
+- **Keys.** Never ask for an API key in chat. If one is missing, ask the user to add it in the settings UI.
+
+The checkpoints, editorial rules and QA checklist stay exactly the same.
+
 ## Check for updates (once per run)
 
 Before Setup, run one quick, non-blocking check. `<skill_dir>` is the folder that contains this `SKILL.md`; pass `--repo` only when the user config sets `update_repo`:
@@ -72,7 +86,8 @@ Read this file from the current working directory at the start of every run, bef
 | `defaults.captions`, `.effects`, `.anim_style`, `.palette`, `.font`, `.loudness` | the house style: `palette` is a preset key or `{"fondo", "texto", "principal", "secundario", "alerta"}` in HEX | intake questions 1–3, 5 and 6 |
 | `glossary` | names and brands for `--glossary` (merged with any new ones) | the glossary invite |
 | `speakers.<id>` | `name` and `title` for lower thirds, `voice_ref` (saved reference wav), `consent` (who allowed what, and when) | re-asking the name and title, picking a voice reference, and the consent question when the use matches |
-| `voice` | `engine` (`voxcpm` \| `cosyvoice`), `steps`, `cfg_value`, `cosyvoice_dir`, `cosyvoice_model` | the engine settings |
+| `voice` | `enabled`, `engine` (`voxcpm` \| `cosyvoice` \| `mistral`), `steps`, `cfg_value`, `cosyvoice_dir`, `cosyvoice_model`, `mistral_model`, `mistral_key_env` | the engine settings |
+| `defaults.platform`, `.video_type`, `.target_duration`, `.cuts`, `.extras`, `.notes`, `transcribe`, `runtime` | written by the plugin's settings UI: target platform, kind of video, cut defaults (`max_gap`, `pad`, `denoise`), whether to write the extras, free-text notes, Whisper model and speaker count, and paths to FFmpeg and each Python environment | the remaining intake questions |
 
 Rules:
 - **Say what you are reusing.** When the config answers intake questions, skip them, and say so in one line so the user can override, for example: "Uso tu configuración: karaoke al 64 %, flat 2D, paleta Calma, voz VoxCPM2. Dime si cambias algo."
@@ -283,6 +298,7 @@ Field notes:
 |---|---|---|
 | `voxcpm` | local, VoxCPM2, Apache-2.0, 48 kHz | Won a blind test against Qwen3-TTS and Chatterbox on accent fidelity (it keeps a Spain-Spanish accent) and naturalness. Needs the reference transcript (`ref.txt` next to `ref_file`, or taken from the transcript for a `ref` span). `pip install voxcpm soundfile`. |
 | `cosyvoice` | local, CosyVoice 3 (0.5B), Apache-2.0, 24 kHz | Lighter alternative with very natural prosody. Needs the reference transcript (`ref.txt`), a clone of the CosyVoice repo (`voice.cosyvoice_dir`) and its own environment (see Setup). `voice.cosyvoice_model` is the Hugging Face id or a local folder with the weights. |
+| `mistral` | Mistral API, Voxtral TTS, pay per use | No local install. The reference clip and each line's text are sent to api.mistral.ai with every request (nothing is stored there); the video stays local. The key goes in the env var named by `voice.mistral_key_env` (default `MISTRAL_API_KEY`), never in a file that goes to git. |
 | `elevenlabs` | ElevenLabs API, paid | **Disabled for now** (do not offer it). The code stays in `voice_clone.py` (`DISABLED_ENGINES`) for when it is enabled again. |
 
 Run `voice_clone.py` with the Python environment of the chosen engine (`_shared/envs/<engine>`). It has two uses, and nothing else:

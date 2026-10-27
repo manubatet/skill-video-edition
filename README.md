@@ -15,6 +15,7 @@
 - **Control de ritmo**: un validador bloquea las líneas de tiempo sobrecargadas.
 - **Clonación de voz** (opcional): corrige una palabra o frase mal dicha, o añade una voz en off corta, con la voz de quien habla (VoxCPM2, Apache-2.0, en local). Solo con consentimiento explícito y sin doblaje.
 - **Extras**: propuesta de título, descripción, hashtags y miniaturas.
+- **Plugin para Claude y ChatGPT** con **pantalla de ajustes**: todas las opciones (tipo de vídeo, subtítulos, efectos, estilo, paleta, motor de voz, clave de Mistral…) se eligen en una interfaz y el vídeo se edita en tu ordenador. Ver [`plugin/README.md`](plugin/README.md).
 
 ### Cómo trabaja
 
@@ -41,6 +42,11 @@ social-video-editor/          ← el skill (lo que se instala)
 │   └── anim_kit.py  sfx_synth.py  voice_clone.py  align_voice.py  check_update.py  common.py
 ├── references/PRD.md         ← producto: objetivos, requisitos, roadmap
 └── agents/openai.yaml        ← metadatos opcionales para ChatGPT / Codex
+plugin/                       ← el plugin: servidor MCP local + pantalla de ajustes
+├── server/                   ← main.py (MCP stdio/HTTP), tools.py, settings.py (solo biblioteca estándar)
+├── ui/editor.html            ← pantalla de ajustes (Claude, ChatGPT y página local)
+├── claude-desktop/manifest.json  build.sh   ← bundle .mcpb para Claude Desktop
+.claude-plugin/               ← manifiesto y marketplace del plugin de Claude Code
 .claude/skills/social-video-editor  → enlace para Claude Code
 .agents/skills/social-video-editor  → enlace para Codex
 ```
@@ -53,6 +59,15 @@ social-video-editor/          ← el skill (lo que se instala)
 | **claude.ai** | Comprime la carpeta (`zip -r social-video-editor.zip social-video-editor`) y súbela en *Settings → Capabilities → Skills*. |
 | **Codex (CLI / IDE)** | Abre este repo: el skill se detecta en `.agents/skills/`. Para uso personal, copia la carpeta a `~/.agents/skills/`. |
 | **ChatGPT** | Sube el mismo `.zip` desde el selector de Skills. `agents/openai.yaml` aporta el nombre, la descripción y el prompt por defecto. |
+
+**Como plugin, con pantalla de ajustes** (recomendado si usas Claude Code, Claude Desktop o ChatGPT):
+
+```bash
+claude plugin marketplace add manubatet/skill-video-edition
+claude plugin install social-video-editor@skill-video-edition
+```
+
+Para Claude Desktop (`.mcpb`), ChatGPT y Codex, sigue [`plugin/README.md`](plugin/README.md).
 
 Después, sube tu vídeo y pide algo como *"edita este vídeo para redes"*, o invoca el skill por su nombre (`/social-video-editor` en Claude Code).
 
