@@ -11,3 +11,6 @@ __pycache__/
 Projects/
 .social-video-editor.json
 .DS_Store
+
+# Built plugin bundles (plugin/build.sh)
+dist/

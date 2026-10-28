@@ -230,11 +230,21 @@ def build_graph(tl, tr, anims_meta, sfx_dir, center, preview, vos=(), target_luf
         v = "vz"
 
     idx = 1
-    for a in sorted(tl.get("animations", []), key=lambda a: a["start"]):
+    fps = tr["fps"]
+    anims = sorted(tl.get("animations", []), key=lambda a: a["start"])
+    for i, a in enumerate(anims):
         m = anims_meta[a["id"]]
         x, y, _, _ = anim_box(a, m, W, H)
         inputs += ["-i", str(Path(a["file"]).resolve())]
-        fc.append(f"[{idx}:v]format=rgba,setpts=PTS-STARTPTS+{a['start']}/TB[an{idx}]")
+        # Back-to-back scenes: FFmpeg rounds each start to the frame grid, so a scene could end one frame before
+        # the next began and the footage flashed through. When the next scene (or the end of the video) starts
+        # within 3 frames, hold the last frame until then; the next overlay is drawn on top anyway.
+        last_f = round(a["start"] * fps) + round(m["duration"] * fps) - 1
+        next_f = round(anims[i + 1]["start"] * fps) if i + 1 < len(anims) else round(tr["duration"] * fps) + 1
+        gap = next_f - 1 - last_f
+        hold = gap + 1 if 0 <= gap <= 3 else 0
+        pad = f"tpad=stop_mode=clone:stop={hold}," if hold else ""
+        fc.append(f"[{idx}:v]format=rgba,{pad}setpts=PTS-STARTPTS+{a['start']}/TB[an{idx}]")
         fc.append(f"[{v}][an{idx}]overlay={x}:{y}:eof_action=pass:format=auto[va{idx}]")
         v = f"va{idx}"
         idx += 1

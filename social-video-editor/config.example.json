@@ -3,6 +3,9 @@
   "ask": "missing",
   "update_repo": "manubatet/skill-video-edition",
   "defaults": {
+    "platform": "reels",
+    "video_type": "consejos",
+    "target_duration": null,
     "captions": {
       "mode": "karaoke",
       "position": "middle",
@@ -18,7 +21,14 @@
     "anim_style": "bold",
     "palette": "energia",
     "font": "Montserrat",
-    "loudness": -14
+    "loudness": -14,
+    "cuts": {
+      "max_gap": 0.4,
+      "pad": 0.12,
+      "denoise": "auto"
+    },
+    "extras": true,
+    "notes": ""
   },
   "glossary": [
     "Lucía Ferrer",
@@ -34,7 +44,12 @@
     }
   },
   "voice": {
+    "enabled": true,
     "engine": "voxcpm",
     "steps": 25
+  },
+  "transcribe": {
+    "model": "large-v3",
+    "speakers": 1
   }
 }

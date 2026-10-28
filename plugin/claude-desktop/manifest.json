@@ -1,0 +1,67 @@
+{
+  "manifest_version": "0.3",
+  "name": "social-video-editor",
+  "display_name": "Social Video Editor",
+  "version": "1.5.0",
+  "description": "Edita en tu ordenador vídeos de cabeza parlante en español para redes: cortes, subtítulos, zooms, SFX, animaciones y voz clonada.",
+  "long_description": "Todas las opciones (tipo de vídeo, subtítulos, efectos, estilo, paleta, motor de voz, clave de Mistral, carpeta de proyectos) se eligen en una pantalla de ajustes dentro del chat. El vídeo se edita entero en tu ordenador con WhisperX, FFmpeg y Pillow. Solo sale algo de él si eliges Mistral para clonar la voz: el fragmento de referencia y el texto de cada frase.",
+  "author": { "name": "manubatet", "url": "https://github.com/manubatet" },
+  "repository": { "type": "git", "url": "https://github.com/manubatet/skill-video-edition" },
+  "homepage": "https://github.com/manubatet/skill-video-edition",
+  "keywords": ["video", "reels", "tiktok", "subtitulos", "whisperx", "ffmpeg"],
+  "server": {
+    "type": "python",
+    "entry_point": "server/main.py",
+    "mcp_config": {
+      "command": "python3",
+      "args": ["${__dirname}/server/main.py"],
+      "env": {
+        "SVE_PROJECTS_DIR": "${user_config.projects_dir}",
+        "MISTRAL_API_KEY": "${user_config.mistral_api_key}",
+        "HF_TOKEN": "${user_config.hf_token}"
+      }
+    }
+  },
+  "tools": [
+    { "name": "open_settings", "description": "Pantalla de ajustes al empezar cada edición: vídeo, subtítulos, efectos, estilo, voz y carpeta." },
+    { "name": "wait_for_settings", "description": "Espera a que pulses Guardar y editar en la página local." },
+    { "name": "get_settings", "description": "Los ajustes guardados, listos para la edición." },
+    { "name": "save_settings", "description": "Guarda los ajustes." },
+    { "name": "get_skill_guide", "description": "El procedimiento completo de edición." },
+    { "name": "check_environment", "description": "Revisa FFmpeg, los entornos de Python y las claves." },
+    { "name": "list_projects", "description": "Proyectos y pasos hechos." },
+    { "name": "setup_project", "description": "Crea el proyecto de un vídeo." },
+    { "name": "run_step", "description": "Ejecuta un paso del montaje en local." },
+    { "name": "job_status", "description": "Estado de un paso en marcha." },
+    { "name": "read_project_file", "description": "Lee un archivo del proyecto." },
+    { "name": "write_project_file", "description": "Escribe los JSON de decisiones y las animaciones." },
+    { "name": "view_image", "description": "Mira un fotograma o la hoja de control." }
+  ],
+  "user_config": {
+    "projects_dir": {
+      "type": "directory",
+      "title": "Carpeta de proyectos",
+      "description": "Dónde se guardan los vídeos editados, los modelos y los entornos. También se puede cambiar en la pantalla de ajustes.",
+      "required": false,
+      "default": "${HOME}/Desktop/Social media videos"
+    },
+    "mistral_api_key": {
+      "type": "string",
+      "title": "API key de Mistral (opcional)",
+      "description": "Solo si quieres clonar la voz con Mistral Voxtral (nube). Se guarda en el llavero del sistema.",
+      "sensitive": true,
+      "required": false
+    },
+    "hf_token": {
+      "type": "string",
+      "title": "Token de Hugging Face (opcional)",
+      "description": "Para detectar quién habla cuando hay varias personas.",
+      "sensitive": true,
+      "required": false
+    }
+  },
+  "compatibility": {
+    "platforms": ["darwin", "linux"],
+    "runtimes": { "python": ">=3.9" }
+  }
+}

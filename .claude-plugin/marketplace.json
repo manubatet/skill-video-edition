@@ -1,0 +1,14 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "skill-video-edition",
+  "description": "Social Video Editor: edición local de vídeos para redes.",
+  "owner": { "name": "manubatet" },
+  "plugins": [
+    {
+      "name": "social-video-editor",
+      "description": "Edita vídeos de cabeza parlante en español en tu ordenador, con una pantalla de ajustes para todas las opciones.",
+      "source": "./",
+      "category": "productivity"
+    }
+  ]
+}

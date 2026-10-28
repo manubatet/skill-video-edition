@@ -22,6 +22,16 @@ This skill follows the open Agent Skills format, so the same folder works in Cla
 
 In this file, "the agent" means whichever assistant is running the skill.
 
+## Start here: ask everything first
+
+The user's choices come first, before any work. The run's **first action** is one of these, before reading or probing the video, opening links, checking for updates, checking the environment or running Setup:
+- **With the plugin** (an `open_settings` tool is available): call `open_settings` with the video path. The settings screen is the intake. See *Plugin mode*.
+- **Without it:** ask the whole *Intake* now, in one go (both rounds back to back), together with:
+  - the projects folder, if the user config doesn't set it (Setup step 1);
+  - any question the request itself raises. For example, for "use this video's intro to make a video about this article": where the intro ends, how long the new video should be, and whether the article's text becomes captions, a voice-over or animations.
+
+If the answer to a question depends on something you have not seen yet (the video, the article), ask it with your best guess as the recommended option, and confirm it at Checkpoint 1. After the answers, work through Setup and the Workflow without new questions until Checkpoint 1, except for blockers (a missing key, a failed install).
+
 ## Core principles
 
 1. **The agent decides, scripts execute.** The agent only writes JSON decision files and animation code. Deterministic scripts do all the media work. Never hand-edit video with ad-hoc FFmpeg commands when a script covers the step.
@@ -46,6 +56,24 @@ The procedure needs four abilities. Each can be done in more than one way, depen
 | **Deliver files** | the platform's file-sharing or download mechanism | tell the user the path of the file |
 
 Never skip a checkpoint because a tool is missing. Use the fallback instead.
+
+## Plugin mode (MCP tools)
+
+When the `social-video-editor` MCP tools are available (the Claude or ChatGPT plugin, see `plugin/README.md` in the repository), the user has already chosen the options in its settings UI. Use the tools instead of the intake and the shell:
+
+- **Settings, first, on every edit.** The settings UI replaces the *Intake* questions. Call `open_settings` with the video path as the run's first action (see *Start here*), so the user reviews this run's options (the saved values are filled in). Ask any question the request itself raises in the same turn.
+  - The page opens in the user's browser. Show them its link from the `open_settings` result as a clickable link, in case it did not open.
+  - Call `wait_for_settings` with `wait_s: 50` until it returns `confirmed`. It also returns the video path the user entered.
+  - Then call `get_settings` and say in one line what you are using, as in *User config*. Copy its `timeline_defaults` (the `style` and `captions` blocks) into `timeline.json` and its `edit_defaults` into `edit.json`. Respect `effects` (zooms, sfx, animations), the caption mode (`off` = no captions), the platform, the video type and the user's notes.
+  - Ask in chat only what the settings don't cover (the glossary for this video, the cut plan, consent). If the user asks to change an option in chat, use `save_settings`.
+- **Setup.** `check_environment` replaces the runtime check, and `setup_project` replaces Setup steps 1–2 (it links the video and copies the scripts).
+- **Commands.** Each command in *Workflow* is one `run_step`: `transcribe`, `build_edit`, `voice_clone`, `align_voice`, `animation` (with `id`), `check`, `preview` (also writes the QA sheet) and `final` (also copies it to `final/`). Steps run in the background: call `job_status` with `wait_s: 50` until the state is `done` or `failed`, and read the log tail.
+- **Files.** Write `edit.json`, `timeline.json`, transcript text fixes, `anims/<id>.py` and `final/extras.md` with `write_project_file`. Read anything in the project with `read_project_file`.
+- **Images.** `view_image` is the *Look at images* ability: the QA sheet, the animation sheets and any frame of the source, cut, preview or final video.
+- **Voice.** The engine comes from the settings, and `run_step voice_clone` writes it into `edit.json`. If voice cloning is off, don't offer voice patches or voice-overs. With `mistral`, tell the user once, before the first generation, that the reference clip and each line's text go to Mistral.
+- **Keys.** Never ask for an API key in chat. If one is missing, ask the user to add it in the settings UI.
+
+The checkpoints, editorial rules and QA checklist stay exactly the same.
 
 ## Check for updates (once per run)
 
@@ -72,7 +100,8 @@ Read this file from the current working directory at the start of every run, bef
 | `defaults.captions`, `.effects`, `.anim_style`, `.palette`, `.font`, `.loudness` | the house style: `palette` is a preset key or `{"fondo", "texto", "principal", "secundario", "alerta"}` in HEX | intake questions 1–3, 5 and 6 |
 | `glossary` | names and brands for `--glossary` (merged with any new ones) | the glossary invite |
 | `speakers.<id>` | `name` and `title` for lower thirds, `voice_ref` (saved reference wav), `consent` (who allowed what, and when) | re-asking the name and title, picking a voice reference, and the consent question when the use matches |
-| `voice` | `engine` (`voxcpm` \| `cosyvoice`), `steps`, `cfg_value`, `cosyvoice_dir`, `cosyvoice_model` | the engine settings |
+| `voice` | `enabled`, `engine` (`voxcpm` \| `cosyvoice` \| `mistral`), `steps`, `cfg_value`, `cosyvoice_dir`, `cosyvoice_model`, `mistral_model`, `mistral_key_env` | the engine settings |
+| `defaults.platform`, `.video_type`, `.target_duration`, `.cuts`, `.extras`, `.notes`, `transcribe`, `runtime` | written by the plugin's settings UI: target platform, kind of video, cut defaults (`max_gap`, `pad`, `denoise`), whether to write the extras, free-text notes, Whisper model and speaker count, and paths to FFmpeg and each Python environment | the remaining intake questions |
 
 Rules:
 - **Say what you are reusing.** When the config answers intake questions, skip them, and say so in one line so the user can override, for example: "Uso tu configuración: karaoke al 64 %, flat 2D, paleta Calma, voz VoxCPM2. Dime si cambias algo."
@@ -102,7 +131,7 @@ Then pick the profile that matches:
 
 The pipeline needs Python 3.9+, FFmpeg built with libass, and a machine that can download the Whisper models from Hugging Face. A GPU is optional: CPU with int8 works but is slower. On Apple Silicon, WhisperX runs on CPU.
 
-1. **Projects folder (ask once, then reuse).** If the user config has `projects_dir`, use it without asking. Otherwise ask the user where to keep their video projects. Recommend `Projects/` inside the current working directory, and accept any path they give. Explain that this folder will hold the finished videos and everything worth reusing: model weights, Python environments, voices, fonts, SFX and animations. Save the answer as `{"projects_dir": "<path>"}` in `.social-video-editor.json`. If the working directory is a git repository, add the projects folder to `.gitignore`, because media and weights never go to git. Layout:
+1. **Projects folder (ask once, then reuse).** If the user config has `projects_dir`, use it without asking. Otherwise ask the user where to keep their video projects. Recommend a folder on the Desktop, `~/Desktop/Social media videos` (the plugin's default), and accept any path they give. Explain that this folder will hold the finished videos and everything worth reusing: model weights, Python environments, voices, fonts, SFX and animations. Save the answer as `{"projects_dir": "<path>"}` in `.social-video-editor.json`. If the working directory is a git repository, add the projects folder to `.gitignore`, because media and weights never go to git. Layout:
    ```
    <projects_dir>/
    ├── _shared/                  reused by every project
@@ -138,7 +167,7 @@ If a model download is blocked (sandboxed or offline machine), switch to runtime
 
 ## Intake: two quick rounds
 
-Skip every question the user config already answers (see *User config*), and state the reused answers in one line. Ask using the *Ask structured questions* ability. The recommended option comes first. If nobody answers, use the defaults and state them. With a question tool that caps questions per call (Claude Code: 4 questions × 4 options, plus an automatic "Other"), run the intake as two calls back to back. In a plain chat message, send round 1, wait for the answer, then send round 2. Either way, ask before any heavy work starts. Wherever this section says "Other", the chat fallback is the "Otro: …" line.
+Skip every question the user config already answers (see *User config*), and state the reused answers in one line. Ask using the *Ask structured questions* ability. The recommended option comes first. If nobody answers, use the defaults and state them. With a question tool that caps questions per call (Claude Code: 4 questions × 4 options, plus an automatic "Other"), run the intake as two calls back to back. In a plain chat message, send round 1, wait for the answer, then send round 2. Either way, this is the run's first action (see *Start here*), before Setup or any other work. Wherever this section says "Other", the chat fallback is the "Otro: …" line.
 
 ### Round 1: what to add
 
@@ -159,7 +188,7 @@ Ask this round when captions or animations are on. Skip it only when both are of
    - **Minimal limpio**: líneas finas, fundidos y deslizamientos suaves, sin rebote.
    - **Flat 2D ilustrado**: iconos y personajes simples de colores planos.
    - **Neón tech**: fondo oscuro, bordes brillantes, entradas rápidas.
-6. **Color palette (style guide)**: single choice. Offer the four presets from *Color palette presets*. Put the five HEX codes in each option's `description`, so the user sees the actual colours. Put the preset that best fits the video's topic first as "(Recommended)". The question text must explain the "Other" format, for example: "¿Qué paleta de colores usamos? Si tienes la tuya, escribe en 'Other' hasta 5 colores HEX en este orden: fondo, texto, principal, secundario, alerta (p. ej. #1E3A4C, #F7F5F0, #5EC2B7, #F4A261, #E76F51)."
+6. **Color palette (style guide)**: single choice. Offer the four presets from *Color palette presets* that best fit the video's topic (AskUserQuestion takes at most 4 options). Put the five HEX codes in each option's `description`, so the user sees the actual colours. Put the preset that best fits the video's topic first as "(Recommended)". The question text must explain the "Other" format, for example: "¿Qué paleta de colores usamos? Si tienes la tuya, escribe en 'Other' hasta 5 colores HEX en este orden: fondo, texto, principal, secundario, alerta (p. ej. #1E3A4C, #F7F5F0, #5EC2B7, #F4A261, #E76F51)."
 
 Custom answers:
 - **Custom style:** a free-text style becomes `style.anim_style`, holding the user's description. Derive its motion and shape rules from the nearest preset and state them at Checkpoint 1.
@@ -283,6 +312,7 @@ Field notes:
 |---|---|---|
 | `voxcpm` | local, VoxCPM2, Apache-2.0, 48 kHz | Won a blind test against Qwen3-TTS and Chatterbox on accent fidelity (it keeps a Spain-Spanish accent) and naturalness. Needs the reference transcript (`ref.txt` next to `ref_file`, or taken from the transcript for a `ref` span). `pip install voxcpm soundfile`. |
 | `cosyvoice` | local, CosyVoice 3 (0.5B), Apache-2.0, 24 kHz | Lighter alternative with very natural prosody. Needs the reference transcript (`ref.txt`), a clone of the CosyVoice repo (`voice.cosyvoice_dir`) and its own environment (see Setup). `voice.cosyvoice_model` is the Hugging Face id or a local folder with the weights. |
+| `mistral` | Mistral API, Voxtral TTS, pay per use | No local install. The reference clip and each line's text are sent to api.mistral.ai with every request (nothing is stored there); the video stays local. The key goes in the env var named by `voice.mistral_key_env` (default `MISTRAL_API_KEY`), never in a file that goes to git. |
 | `elevenlabs` | ElevenLabs API, paid | **Disabled for now** (do not offer it). The code stays in `voice_clone.py` (`DISABLED_ENGINES`) for when it is enabled again. |
 
 Run `voice_clone.py` with the Python environment of the chosen engine (`_shared/envs/<engine>`). It has two uses, and nothing else:
@@ -413,8 +443,11 @@ Also set `style.palette` to the preset's key, or to `"custom"`.
 | `calma` | Calma (salud) | `#1E3A4C` | `#F7F5F0` | `#5EC2B7` | `#F4A261` | `#E76F51` | salud, psicología, bienestar, educación |
 | `pop` | Pop (rosa y violeta) | `#1A1033` | `#FFFFFF` | `#FF4FA3` | `#7C5CFF` | `#FFD23F` | lifestyle, moda, belleza, entretenimiento |
 | `tierra` | Tierra (elegante) | `#2B2622` | `#FAF6F0` | `#D9B26F` | `#8DB38B` | `#C4553A` | gastronomía, viajes, marca personal premium |
+| `oceano` | Océano (corporativo) | `#0B2545` | `#F4F7FB` | `#4CC9F0` | `#FFB703` | `#FF5D73` | empresa, finanzas, tecnología |
+| `noche` | Noche (tech) | `#0D0D14` | `#F2F2F7` | `#00E5FF` | `#C77DFF` | `#FF2E63` | tech, gaming, IA |
+| `bosque` | Bosque (natural) | `#16261D` | `#F3F1E7` | `#9BD770` | `#F2C14E` | `#E4572E` | sostenibilidad, deporte, naturaleza |
 
-All four keep at least 3:1 WCAG contrast for every role on `fondo`, and at least 4.5:1 for texto and principal. With a custom palette:
+All presets keep at least 3:1 WCAG contrast for every role on `fondo`, and at least 4.5:1 for texto and principal. With a custom palette:
 - Check the same contrasts.
 - If principal on fondo is below 3:1, use texto as `accent_text` instead of fondo, and tell the user.
 - If texto on fondo is below 4.5:1, warn the user and propose the nearest fix.
