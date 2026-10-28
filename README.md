@@ -1,6 +1,18 @@
 # skill-video-edition
 
-**Social Video Editor** es un *Agent Skill* que convierte un vídeo en bruto de una persona hablando a cámara, en español, en un clip listo para Reels, TikTok, Shorts o LinkedIn. Solo usa herramientas de código abierto (WhisperX, FFmpeg, Pillow, OpenCV). Funciona con **Claude** (Claude Code y claude.ai), **ChatGPT** y **Codex**, porque sigue el formato abierto de skills: una carpeta con un `SKILL.md`, scripts y referencias.
+**Social Video Editor** es un **plugin para Claude y ChatGPT** que convierte un vídeo en bruto de una persona hablando a cámara, en español, en un clip listo para Reels, TikTok, Shorts o LinkedIn.
+
+- **Pantalla de ajustes**: al empezar cada edición se abre en tu navegador una página con todas las opciones (tipo de vídeo, subtítulos, efectos, estilo de animación, paleta de colores, motor de voz, clave de Mistral, carpeta de proyectos). Las revisas, pulsas *Guardar y editar* y el agente empieza.
+- **Todo en tu ordenador**: el vídeo se transcribe, se corta, se anima y se renderiza en local, con herramientas de código abierto (WhisperX, FFmpeg, Pillow, OpenCV). Solo sale algo si eliges *Mistral Voxtral* para la voz clonada.
+- Dentro lleva el **skill** (`social-video-editor/`): el procedimiento que sigue el agente y los scripts. También se puede usar solo, sin plugin (ver *Instalación*).
+
+## Cómo se usa
+
+1. Instala el plugin (abajo) y abre una sesión nueva.
+2. Pide algo como *"edita ~/Desktop/mi-video.mov para Reels"*.
+3. Se abre la pantalla de ajustes en tu navegador, con tus valores guardados y el vídeo ya puesto. El agente te deja también el enlace en el chat. Cambia lo que quieras para este vídeo y pulsa **Guardar y editar**.
+4. El agente edita y se para en dos puntos de revisión: el plan de cortes y efectos, y la vista previa.
+5. El vídeo final queda en `<carpeta de proyectos>/<vídeo>/final/`.
 
 ## Qué hace
 
@@ -11,11 +23,10 @@
 - **Zooms graduales**: acercamientos suaves centrados en la cara que tardan 0,7 s en entrar y en salir, en lugar de cortes.
 - **Efectos de sonido** sintetizados, libres de derechos y colocados con moderación.
 - **Animaciones programadas**: el agente escribe cada animación en Python y se superpone con transparencia. Pueden ser tarjetas, contadores, sellos, barras de progreso o escenas 2D a pantalla completa.
-- **Guía de estilo**: 4 estilos de animación y 4 paletas de 5 colores con contraste verificado, o colores propios en HEX.
+- **Guía de estilo**: 4 estilos de animación y 7 paletas de 5 colores con contraste verificado. Cualquier color se puede cambiar por su código HEX.
 - **Control de ritmo**: un validador bloquea las líneas de tiempo sobrecargadas.
-- **Clonación de voz** (opcional): corrige una palabra o frase mal dicha, o añade una voz en off corta, con la voz de quien habla (VoxCPM2, Apache-2.0, en local). Solo con consentimiento explícito y sin doblaje.
+- **Clonación de voz** (opcional): corrige una palabra o frase mal dicha, o añade una voz en off corta, con la voz de quien habla. En local con VoxCPM2 o CosyVoice 3, o en la nube con Mistral Voxtral. Solo con consentimiento explícito y sin doblaje.
 - **Extras**: propuesta de título, descripción, hashtags y miniaturas.
-- **Plugin para Claude y ChatGPT** con **pantalla de ajustes**: todas las opciones (tipo de vídeo, subtítulos, efectos, estilo, paleta, motor de voz, clave de Mistral…) se eligen en una interfaz y el vídeo se edita en tu ordenador. Ver [`plugin/README.md`](plugin/README.md).
 
 ### Cómo trabaja
 
@@ -35,16 +46,16 @@ vídeo ─► transcribe.py ─► transcript.json ──(agente: cortes)──�
 ## Estructura del repositorio
 
 ```
-social-video-editor/          ← el skill (lo que se instala)
+social-video-editor/          ← el skill: procedimiento y scripts (va dentro del plugin)
 ├── SKILL.md                  ← procedimiento para el agente
 ├── scripts/                  ← pipeline determinista (Python + FFmpeg)
 │   ├── transcribe.py  build_edit.py  captions.py  render.py
 │   └── anim_kit.py  sfx_synth.py  voice_clone.py  align_voice.py  check_update.py  common.py
 ├── references/PRD.md         ← producto: objetivos, requisitos, roadmap
 └── agents/openai.yaml        ← metadatos opcionales para ChatGPT / Codex
-plugin/                       ← el plugin: servidor MCP local + pantalla de ajustes
+plugin/                       ← el plugin: servidor MCP local + página de ajustes
 ├── server/                   ← main.py (MCP stdio/HTTP), tools.py, settings.py (solo biblioteca estándar)
-├── ui/editor.html            ← pantalla de ajustes (Claude, ChatGPT y página local)
+├── ui/editor.html            ← pantalla de ajustes (página local en tu navegador)
 ├── claude-desktop/manifest.json  build.sh   ← bundle .mcpb para Claude Desktop
 .claude-plugin/               ← manifiesto y marketplace del plugin de Claude Code
 .claude/skills/social-video-editor  → enlace para Claude Code
@@ -53,39 +64,43 @@ plugin/                       ← el plugin: servidor MCP local + pantalla de aj
 
 ## Instalación
 
-| Agente | Cómo |
-|---|---|
-| **Claude Code** | Abre este repo: el skill se detecta en `.claude/skills/`. Para usarlo en cualquier proyecto, copia `social-video-editor/` a `~/.claude/skills/`. |
-| **claude.ai** | Comprime la carpeta (`zip -r social-video-editor.zip social-video-editor`) y súbela en *Settings → Capabilities → Skills*. |
-| **Codex (CLI / IDE)** | Abre este repo: el skill se detecta en `.agents/skills/`. Para uso personal, copia la carpeta a `~/.agents/skills/`. |
-| **ChatGPT** | Sube el mismo `.zip` desde el selector de Skills. `agents/openai.yaml` aporta el nombre, la descripción y el prompt por defecto. |
+### Plugin (recomendado)
 
-**Como plugin, con pantalla de ajustes** (recomendado si usas Claude Code, Claude Desktop o ChatGPT):
+**Claude Code:**
 
 ```bash
 claude plugin marketplace add manubatet/skill-video-edition
 claude plugin install social-video-editor@skill-video-edition
 ```
 
-Para Claude Desktop (`.mcpb`), ChatGPT y Codex, sigue [`plugin/README.md`](plugin/README.md).
+Para **Claude Desktop** (archivo `.mcpb`), **ChatGPT** y **Codex**, sigue [`plugin/README.md`](plugin/README.md). Ahí también se explica qué sale de tu ordenador y cómo se guarda la clave de Mistral.
 
-Después, sube tu vídeo y pide algo como *"edita este vídeo para redes"*, o invoca el skill por su nombre (`/social-video-editor` en Claude Code).
+### Solo el skill (sin pantalla de ajustes)
+
+El agente te hace las preguntas en el chat en lugar de abrir la pantalla de ajustes.
+
+| Agente | Cómo |
+|---|---|
+| **Claude Code** | Abre este repo: el skill se detecta en `.claude/skills/`. Para usarlo en cualquier proyecto, copia `social-video-editor/` a `~/.claude/skills/`. |
+| **claude.ai** | Sube `dist/social-video-editor-skill.zip` (lo crea `plugin/build.sh`) en *Settings → Capabilities → Skills*. Allí no hay edición en tu ordenador: corre en la nube (ver *Entornos sin red*). |
+| **Codex (CLI / IDE)** | Abre este repo: el skill se detecta en `.agents/skills/`. Para uso personal, copia la carpeta a `~/.agents/skills/`. |
+| **ChatGPT** | Sube el mismo `.zip` desde el selector de Skills. `agents/openai.yaml` aporta el nombre, la descripción y el prompt por defecto. |
 
 ## Versiones
 
-`social-video-editor/VERSION` guarda la versión del skill (`MAJOR.MINOR.PATCH`). Al empezar, el skill la compara con la publicada en `main` (`scripts/check_update.py`) y avisa si hay una nueva. **Cada cambio en el skill debe subir la versión** en el mismo PR: `PATCH` para correcciones, `MINOR` para funciones nuevas y `MAJOR` si cambian los formatos de `edit.json` o `timeline.json`.
+`social-video-editor/VERSION` guarda la versión del plugin y del skill (`MAJOR.MINOR.PATCH`); `.claude-plugin/plugin.json` y `plugin/claude-desktop/manifest.json` llevan la misma. Al empezar, el skill la compara con la publicada en `main` (`scripts/check_update.py`) y avisa si hay una nueva. **Cada cambio debe subir la versión** en los tres archivos y en el mismo PR (si no, `claude plugin update` no ve el cambio): `PATCH` para correcciones, `MINOR` para funciones nuevas y `MAJOR` si cambian los formatos de `edit.json` o `timeline.json`.
 
 ## Carpeta de proyectos
 
-La primera vez, el skill te pregunta dónde guardar los proyectos (por defecto, `Projects/`) y lo recuerda en `.social-video-editor.json`. Ahí se queda todo lo reutilizable, para no descargar ni rehacer nada en el siguiente vídeo:
+La carpeta de proyectos se elige en la pantalla de ajustes (por defecto, `~/Desktop/Social media videos`) y se recuerda en `.social-video-editor.json`. Ahí se queda todo lo reutilizable, para no descargar ni rehacer nada en el siguiente vídeo:
 
 ```
-Projects/
+Social media videos/
 ├── _shared/          modelos (HF_HOME), entornos de Python, voces clonadas, fuentes, SFX y animaciones reutilizables
 └── <vídeo>/          scripts/, work/ (transcripción, JSON de decisiones, animaciones, voz) y final/ (vídeo final + textos)
 ```
 
-La carpeta está en `.gitignore`: los vídeos y los pesos de los modelos nunca se suben a GitHub.
+Si la pones dentro de un repositorio, añádela a `.gitignore`: los vídeos y los pesos de los modelos nunca deben subirse a GitHub.
 
 ## Requisitos
 
