@@ -4,8 +4,10 @@ Usage (in the environment of the chosen engine):
   python voice_clone.py --work work/ [--force] [--device cuda|mps|cpu]
 
 Engines (edit.json "voice.engine"):
-  voxcpm      VoxCPM2 (Apache-2.0, local, 48 kHz). The engine: it won a blind test against
+  voxcpm      VoxCPM2 (Apache-2.0, local, 48 kHz). Default: it won a blind test against
               Qwen3-TTS and Chatterbox on accent fidelity and naturalness.
+  cosyvoice   CosyVoice 3 (Apache-2.0, local, 0.5B, 24 kHz). Lighter; needs a clone of the
+              FunAudioLLM/CosyVoice repo (voice.cosyvoice_dir) and its own environment.
   elevenlabs  ElevenLabs API (paid, cloud). DISABLED for now: load_elevenlabs is kept and tested;
               add it back to ENGINES to enable it. Key from the env var in voice.api_key_env.
 
@@ -19,7 +21,9 @@ Settings (edit.json "voice", all optional except consent):
     "ref": [31.2, 43.0],      # source seconds of clean speech to clone from; null = pick automatically
     "ref_file": null,         # or a saved reference wav (e.g. _shared/voices/<speaker>/ref.wav);
                               # its transcript goes in ref.txt next to it (voxcpm needs it)
-    "engine": "voxcpm",       # voxcpm (elevenlabs is disabled for now)
+    "engine": "voxcpm",       # voxcpm | cosyvoice (elevenlabs is disabled for now)
+    "cosyvoice_dir": null,    # cosyvoice: path to the cloned FunAudioLLM/CosyVoice repo
+    "cosyvoice_model": "FunAudioLLM/Fun-CosyVoice3-0.5B-2512",   # cosyvoice: HF repo id or local folder
     "steps": 25,              # voxcpm: diffusion steps (10 = fast draft, 25-30 = clean final audio)
     "cfg_value": 2.0,         # voxcpm: guidance; lower sounds looser, higher more literal
     "api_key_env": "ELEVENLABS_API_KEY",   # elevenlabs: env var holding the key (never the key itself)
@@ -47,9 +51,11 @@ sys.path.insert(0, str(Path(__file__).parent))
 from common import die, load, need, run, save, wav_duration  # noqa: E402
 
 VOICE_DEFAULTS = {"consent": False, "ref": None, "ref_file": None, "engine": "voxcpm", "steps": 25,
-                  "cfg_value": 2.0, "api_key_env": "ELEVENLABS_API_KEY",
+                  "cfg_value": 2.0, "cosyvoice_dir": None,
+                  "cosyvoice_model": "FunAudioLLM/Fun-CosyVoice3-0.5B-2512", "api_key_env": "ELEVENLABS_API_KEY",
                   "elevenlabs_model": "eleven_multilingual_v2", "seed": 7}
-ENGINE_SETTINGS = {"voxcpm": ("steps", "cfg_value", "seed"), "elevenlabs": ("elevenlabs_model", "seed")}
+ENGINE_SETTINGS = {"voxcpm": ("steps", "cfg_value", "seed"), "cosyvoice": ("cosyvoice_model", "seed"),
+                   "elevenlabs": ("elevenlabs_model", "seed")}
 REF_MIN, REF_IDEAL, REF_MAX = 5.0, 8.0, 15.0  # seconds of reference speech
 ELEVENLABS_API = "https://api.elevenlabs.io/v1"
 SR = 48000
@@ -180,6 +186,33 @@ def load_voxcpm(device, ref, ref_text, cfg, work):
     return synth, "VoxCPM2"
 
 
+def load_cosyvoice(device, ref, ref_text, cfg, work):
+    src = Path(cfg["cosyvoice_dir"] or os.environ.get("COSYVOICE_DIR", "")).expanduser()
+    if not (src / "cosyvoice").is_dir():
+        die("cosyvoice needs voice.cosyvoice_dir: git clone --recursive https://github.com/FunAudioLLM/CosyVoice")
+    if not ref_text:
+        die("cosyvoice needs the reference transcript: put it in ref.txt next to voice.ref_file")
+    sys.path[:0] = [str(src.resolve()), str((src / "third_party" / "Matcha-TTS").resolve())]
+    try:
+        from cosyvoice.cli.cosyvoice import AutoModel
+    except ImportError as e:
+        die(f"CosyVoice dependencies are missing ({e}); see SKILL.md > Setup > Voice cloning")
+    model_dir = cfg["cosyvoice_model"]
+    if not Path(model_dir).is_dir():
+        from huggingface_hub import snapshot_download
+        model_dir = snapshot_download(model_dir)
+    model = AutoModel(model_dir=str(model_dir))
+    prompt = "You are a helpful assistant.<|endofprompt|>" + ref_text
+
+    def synth(text):
+        import torch
+        torch.manual_seed(cfg["seed"])
+        chunks = [c["tts_speech"].squeeze().cpu().numpy()
+                  for c in model.inference_zero_shot(text, prompt, str(ref), stream=False)]
+        return np.concatenate(chunks).astype(np.float32), model.sample_rate
+    return synth, "CosyVoice 3"
+
+
 def _el_request(url, key, body, content_type):
     req = urllib.request.Request(url, data=body, method="POST",
                                  headers={"xi-api-key": key, "Content-Type": content_type})
@@ -230,7 +263,7 @@ def load_elevenlabs(device, ref, ref_text, cfg, work):
     return synth, f"ElevenLabs {cfg['elevenlabs_model']} (voice {voice_id})"
 
 
-ENGINES = {"voxcpm": load_voxcpm}
+ENGINES = {"voxcpm": load_voxcpm, "cosyvoice": load_cosyvoice}
 # Turned off until it is needed; enabling it is one line: ENGINES["elevenlabs"] = load_elevenlabs
 DISABLED_ENGINES = {"elevenlabs": load_elevenlabs}
 

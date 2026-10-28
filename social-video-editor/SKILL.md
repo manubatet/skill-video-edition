@@ -72,7 +72,7 @@ Read this file from the current working directory at the start of every run, bef
 | `defaults.captions`, `.effects`, `.anim_style`, `.palette`, `.font`, `.loudness` | the house style: `palette` is a preset key or `{"fondo", "texto", "principal", "secundario", "alerta"}` in HEX | intake questions 1–3, 5 and 6 |
 | `glossary` | names and brands for `--glossary` (merged with any new ones) | the glossary invite |
 | `speakers.<id>` | `name` and `title` for lower thirds, `voice_ref` (saved reference wav), `consent` (who allowed what, and when) | re-asking the name and title, picking a voice reference, and the consent question when the use matches |
-| `voice` | `engine` (`voxcpm`), `steps`, `cfg_value` | the engine settings |
+| `voice` | `engine` (`voxcpm` \| `cosyvoice`), `steps`, `cfg_value`, `cosyvoice_dir`, `cosyvoice_model` | the engine settings |
 
 Rules:
 - **Say what you are reusing.** When the config answers intake questions, skip them, and say so in one line so the user can override, for example: "Uso tu configuración: karaoke al 64 %, flat 2D, paleta Calma, voz VoxCPM2. Dime si cambias algo."
@@ -132,6 +132,7 @@ The pipeline needs Python 3.9+, FFmpeg built with libass, and a machine that can
    - **Caption font.** Put a bold TTF (default: Montserrat ExtraBold, OFL license) in `work/fonts/`. Set `style.font` to the font's family name. Without it, captions fall back to a system font.
    - **Better SFX.** Any `.wav` placed in `sfx/` with the same name (for example a CC0 `whoosh.wav` from Freesound) replaces the synthesized one.
    - **Voice cloning.** VoxCPM2 (Apache-2.0): `pip install voxcpm soundfile` in its own venv (`_shared/envs/voxcpm`), with Python 3.10–3.12; its `torch` can clash with WhisperX's, so keep the two environments apart. The first run downloads the model (about 4 GB) from Hugging Face. It runs on CUDA, Apple MPS or CPU. Install it only when the user wants a voice fix or narration.
+     CosyVoice 3 (optional): `git clone --recursive https://github.com/FunAudioLLM/CosyVoice <projects_dir>/_shared/engines/CosyVoice`, then in a new venv (`_shared/envs/cosyvoice`, Python 3.10–3.11): `pip install "setuptools<80" numpy==1.26.4 cython`, `pip install --no-build-isolation openai-whisper==20231117 pyworld==0.3.4`, `pip install -r <repo>/requirements.txt`. The Linux-only extras (deepspeed, TensorRT) are skipped automatically on macOS.
 
 If a model download is blocked (sandboxed or offline machine), switch to runtime profile 2.
 
@@ -276,11 +277,12 @@ Field notes:
 
 ## Voice cloning (optional)
 
-`scripts/voice_clone.py` generates Spanish speech in the speaker's own voice, zero-shot from about 10 s of their speech, with VoxCPM2 (`voice.engine`: `voxcpm`):
+`scripts/voice_clone.py` generates Spanish speech in the speaker's own voice, zero-shot from about 10 s of their speech, with one of these engines (`voice.engine`):
 
 | Engine | Where it runs | Notes |
 |---|---|---|
 | `voxcpm` | local, VoxCPM2, Apache-2.0, 48 kHz | Won a blind test against Qwen3-TTS and Chatterbox on accent fidelity (it keeps a Spain-Spanish accent) and naturalness. Needs the reference transcript (`ref.txt` next to `ref_file`, or taken from the transcript for a `ref` span). `pip install voxcpm soundfile`. |
+| `cosyvoice` | local, CosyVoice 3 (0.5B), Apache-2.0, 24 kHz | Lighter alternative with very natural prosody. Needs the reference transcript (`ref.txt`), a clone of the CosyVoice repo (`voice.cosyvoice_dir`) and its own environment (see Setup). `voice.cosyvoice_model` is the Hugging Face id or a local folder with the weights. |
 | `elevenlabs` | ElevenLabs API, paid | **Disabled for now** (do not offer it). The code stays in `voice_clone.py` (`DISABLED_ENGINES`) for when it is enabled again. |
 
 Run `voice_clone.py` with the Python environment of the chosen engine (`_shared/envs/<engine>`). It has two uses, and nothing else:
